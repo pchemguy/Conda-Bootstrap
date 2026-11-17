@@ -1,9 +1,9 @@
-name: dms
+name: conda_bootstrap
 channels:
   - conda-forge
   - nodefaults
 dependencies:
-  - python=3.11
+  - python
   - conda
   - mamba
   - micromamba
