@@ -217,19 +217,6 @@ for %%F in ("%~dp0config_*.bat") do (
 echo %OKOK% Loaded extra environment settings.
 echo:
 
-:: --- Hugging Face ---
-
-set "HF_HOME=%USERPROFILE%\.cache\huggingface"
-set "HF_HUB_DISABLE_TELEMETRY=1"
-REM set "HF_HUB_DISABLE_UPDATE_CHECK=1"
-set "HF_XET_RECONSTRUCT_WRITE_SEQUENTIALLY=1"
-echo %OKOK% Hugging Face is set.
-
-:: --- Tesseract OCR ---
-
-set "Path=%Path%;%CONDA_PREFIX%\bin\tesseract"
-echo %OKOK% Hugging Face is set.
-
 :: --- Execute CLI, if defined ---
 
 if defined _ARG_CLI (
