@@ -24,13 +24,15 @@
 ::
 ::  Behavioral Summary:
 ::      1. Verifies cmd.exe configuration and base environment cleanliness.
-::      2. Activates MS Build Tools environment or notifies user of failure.
-::      3. Ensures Conda (or Micromamba) environment readiness.
-::      4. Sequentially activates pthreads, OpenCV, and libjpeg-turbo.
-::      5. Updates INCLUDE, LIB, and LINK paths to integrate Conda libraries.
-::      6. Exposes DISTUTILS_USE_SDK=1 to enable setuptools to reuse the
+::      2. Validates target Conda installation files before modifying state.
+::      3. Configures cache directories and profile cache junctions.
+::      4. Activates MS Build Tools environment or notifies user of failure.
+::      5. Ensures Conda (or Micromamba) environment readiness.
+::      6. Sequentially activates pthreads, OpenCV, and libjpeg-turbo.
+::      7. Updates INCLUDE, LIB, and LINK paths to integrate Conda libraries.
+::      8. Exposes DISTUTILS_USE_SDK=1 to enable setuptools to reuse the
 ::         existing MSVC environment instead of launching new compiler shells.
-::      7. Starts FAR Manager if available, or leaves the user in a prepared
+::      9. Starts FAR Manager if available, or leaves the user in a prepared
 ::         cmd.exe session.
 ::
 ::  Exit Codes:
@@ -42,6 +44,7 @@
 ::      - Colorized output can be disabled by defining NOCOLOR=1 or NO_COLOR=1.
 :: ============================================================================
 
+set "ERRORLEVEL="
 set "FINAL_EXIT_CODE=0"
 set "EXIT_STATUS=1"
 
@@ -94,6 +97,33 @@ if not "%ERRORLEVEL%"=="0" (
     setlocal EnableDelayedExpansion EnableExtensions
 )
 
+:: --- Base / Root environment guard (fail fast before modifying disk) ---
+
+call :NO_ROOT_ENVIRONMENT
+if not "%ERRORLEVEL%"=="0" (
+    set "FINAL_EXIT_CODE=%ERRORLEVEL%"
+    echo %ERROR% Aborting due to pre-existing Python/Conda environment.
+    goto :CLEANUP
+)
+
+:: --- Validate target Conda installation files before modifying state ---
+
+if not exist "%__CONDA_PREFIX%\python.exe" (
+    echo %ERROR% Python not found: "%__CONDA_PREFIX%\python.exe". Aborting...
+    set "FINAL_EXIT_CODE=1"
+    goto :CLEANUP
+)
+if not exist "%CONDA_BAT%" (
+    echo %ERROR% Conda activation script not found: "%CONDA_BAT%". Aborting...
+    set "FINAL_EXIT_CODE=1"
+    goto :CLEANUP
+)
+if not exist "%MAMBA_BAT%" (
+    echo %ERROR% Mamba activation script not found: "%MAMBA_BAT%". Aborting...
+    set "FINAL_EXIT_CODE=1"
+    goto :CLEANUP
+)
+
 :: --- Determine cache directory ---
 
 call :CACHE_DIR
@@ -110,20 +140,20 @@ if not defined _CACHE (
 )
 echo:
 
-:: --- Base / Root environment guard ---
-
-call :NO_ROOT_ENVIRONMENT
-if not "%ERRORLEVEL%"=="0" (
-    set "FINAL_EXIT_CODE=%ERRORLEVEL%"
-    echo %ERROR% Aborting due to pre-existing Python/Conda environment.
-    goto :CLEANUP
-)
-
 :: --- Rename m2 link.exe before MSBuild check, if present ---
 
 if exist "%__CONDA_PREFIX%\Library\usr\bin\link.exe" (
     echo %INFO% Renaming m2 link.exe to link_.exe to resolve MSBuild linker collision.
-    move /Y "%__CONDA_PREFIX%\Library\usr\bin\link.exe" "%__CONDA_PREFIX%\Library\usr\bin\link_.exe" >nul
+    if exist "%__CONDA_PREFIX%\Library\usr\bin\link_.exe" (
+        echo %WARN% Removing previous backup "%__CONDA_PREFIX%\Library\usr\bin\link_.exe".
+        del /F /Q "%__CONDA_PREFIX%\Library\usr\bin\link_.exe"
+        if not "!ERRORLEVEL!"=="0" (
+            echo %ERROR% Failed to remove existing "%__CONDA_PREFIX%\Library\usr\bin\link_.exe". Aborting...
+            set "FINAL_EXIT_CODE=1"
+            goto :CLEANUP
+        )
+    )
+    move "%__CONDA_PREFIX%\Library\usr\bin\link.exe" "%__CONDA_PREFIX%\Library\usr\bin\link_.exe" >nul
     if not "!ERRORLEVEL!"=="0" (
         echo %ERROR% Failed to rename "%__CONDA_PREFIX%\Library\usr\bin\link.exe". Aborting...
         set "FINAL_EXIT_CODE=1"
@@ -155,29 +185,11 @@ set "DISTUTILS_USE_SDK=1"
 
 :MSBUILD_SKIP
 
-:: --- Python.exe, conda.bat, and mamba.bat must exist in Conda environment ---
-
-if not exist "%__CONDA_PREFIX%\python.exe" (
-    echo %ERROR% Python not found: "%__CONDA_PREFIX%\python.exe". Aborting...
-    set "FINAL_EXIT_CODE=1"
-    goto :CLEANUP
-)
-if not exist "%CONDA_BAT%" (
-    echo %ERROR% Conda activation script not found: "%CONDA_BAT%". Aborting...
-    set "FINAL_EXIT_CODE=1"
-    goto :CLEANUP
-)
-if not exist "%MAMBA_BAT%" (
-    echo %ERROR% Mamba activation script not found: "%MAMBA_BAT%". Aborting...
-    set "FINAL_EXIT_CODE=1"
-    goto :CLEANUP
-)
-
 :: --- Activate Conda environment ---
 
 echo:
 echo %WARN% Activating Conda PREFIX "%__CONDA_PREFIX%".
-call "%CONDA_BAT%" activate "%__CONDA_PREFIX%"
+call "%CONDA_BAT%" activate
 if not "%ERRORLEVEL%"=="0" (
     set "FINAL_EXIT_CODE=%ERRORLEVEL%"
     echo %ERROR% Conda environment activation failed. Aborting...
@@ -263,15 +275,16 @@ for %%A in ("far.bat" "far.exe") do if not defined _FARMANAGER (
     )
 )
 
-if defined _FARMANAGER (
-    echo %INFO% Launching FAR Manager: "!_FARMANAGER!" in "%CONDA_PREFIX%"
-    call :CLEAR_VARS
-    cmd.exe /E:ON /V:ON /C "%_FARMANAGER% ""%CONDA_PREFIX%"""
-    set "FINAL_EXIT_CODE=%ERRORLEVEL%"
-    set "_FARMANAGER="
-    goto :CLEANUP
-)
+if not defined _FARMANAGER goto :START_CMD_SHELL
 
+echo %INFO% Launching FAR Manager: "%_FARMANAGER%" in "%CONDA_PREFIX%"
+call :CLEAR_VARS
+cmd.exe /E:ON /V:ON /C "%_FARMANAGER% ""%CONDA_PREFIX%"""
+set "FINAL_EXIT_CODE=%ERRORLEVEL%"
+set "_FARMANAGER="
+goto :CLEANUP
+
+:START_CMD_SHELL
 echo %WARN% FAR Manager (far.bat / far.exe) not found on PATH. Opening interactive cmd.exe session...
 call :CLEAR_VARS
 cmd.exe /E:ON /V:ON /K cd /d "%CONDA_PREFIX%"
@@ -424,6 +437,8 @@ exit /b 0
 :: ============================================================================
 :: --- Clean up; prefer as the primary script exit point ---
 :: To exit script, set FINAL_EXIT_CODE and goto CLEANUP
+:: Note: CONDA_BAT and MAMBA_BAT are intentionally preserved for callers
+:: such as Anaconda.bat.
 
 :CLEANUP
 call :CLEAR_VARS
@@ -443,8 +458,6 @@ set "_PKGS_DIR="
 set "_CONDA_EXE="
 set "_CONDA_ROOT="
 set "__CONDA_PREFIX="
-set "CONDA_BAT="
-set "MAMBA_BAT="
 set "_DUMMY="
 set "SRC="
 set "DST="
@@ -586,17 +599,19 @@ echo %INFO% UV_CACHE_DIR             directory: "%UV_CACHE_DIR%".
 
 set "SRC=%PIP_CACHE_DIR%"
 set "DST=%LOCALAPPDATA%\pip"
-if exist "%DST%" (
-    rmdir /S /Q "%DST%"
+if not exist "%DST%" (
+    mkdir "%DST%"
     if not "!ERRORLEVEL!"=="0" (
-        echo %ERROR% Failed to remove existing "%DST%".
+        echo %ERROR% Failed to create "%DST%".
         exit /b 1
     )
 )
-mkdir "%DST%"
-if not "%ERRORLEVEL%"=="0" (
-    echo %ERROR% Failed to create "%DST%".
-    exit /b 1
+if exist "%DST%\cache" (
+    rmdir /S /Q "%DST%\cache"
+    if not "!ERRORLEVEL!"=="0" (
+        echo %ERROR% Failed to remove existing "%DST%\cache".
+        exit /b 1
+    )
 )
 mklink /j "%DST%\cache" "%SRC%" >nul
 if not "%ERRORLEVEL%"=="0" (
@@ -607,17 +622,19 @@ echo %INFO% Profile pip cache dir is linked: "%DST%\cache".
 
 set "SRC=%UV_CACHE_DIR%"
 set "DST=%LOCALAPPDATA%\uv"
-if exist "%DST%" (
-    rmdir /S /Q "%DST%"
+if not exist "%DST%" (
+    mkdir "%DST%"
     if not "!ERRORLEVEL!"=="0" (
-        echo %ERROR% Failed to remove existing "%DST%".
+        echo %ERROR% Failed to create "%DST%".
         exit /b 1
     )
 )
-mkdir "%DST%"
-if not "%ERRORLEVEL%"=="0" (
-    echo %ERROR% Failed to create "%DST%".
-    exit /b 1
+if exist "%DST%\cache" (
+    rmdir /S /Q "%DST%\cache"
+    if not "!ERRORLEVEL!"=="0" (
+        echo %ERROR% Failed to remove existing "%DST%\cache".
+        exit /b 1
+    )
 )
 mklink /j "%DST%\cache" "%SRC%" >nul
 if not "%ERRORLEVEL%"=="0" (
@@ -793,6 +810,12 @@ exit /b 1
 
 :: ============================================================================ NO_ROOT_ENVIRONMENT BEGIN
 :: ============================================================================
+:: --------------------------------------------------------
+:: NO_ROOT_ENVIRONMENT
+::
+:: Rejects execution from any shell where Python or Conda is already active or
+:: exposed on PATH to prevent header/library contamination during builds.
+:: --------------------------------------------------------
 :NO_ROOT_ENVIRONMENT
 
 echo:
@@ -805,10 +828,13 @@ echo ===========================================================================
 echo ====================================================================================
 echo:
 
-:: --- Check if Conda or Python is on the Path ---
+:: --- Check if Conda or Python is active or on the Path ---
 
 set "_CONDA="
 set "_PYTHON="
+if defined CONDA_PREFIX (
+    set "_CONDA=%CONDA_PREFIX%"
+)
 echo %INFO% Checking if Python is on the Path
 where.exe python.exe 2>nul
 if "%ERRORLEVEL%"=="0" (
@@ -825,6 +851,9 @@ if not defined _CONDA if not defined _PYTHON (
 )
 
 echo:
+if defined CONDA_PREFIX (
+    echo %WARN% Detected active CONDA_PREFIX="%CONDA_PREFIX%".
+)
 if defined _PYTHON (
     echo %WARN% Detected "python.exe" in Path.
 )
