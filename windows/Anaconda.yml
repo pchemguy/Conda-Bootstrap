@@ -1,0 +1,43 @@
+name: dms
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - nodejs
+  - aiohttp
+  - aiosqlite
+  - psutil
+  - jsonschema
+  - python-fastjsonschema
+  - pyyaml
+  - libarchive
+  - icu
+  - numpy
+  - coverage
+  - pyinstrument
+  - pyperf
+  - pytest
+  - pytest-benchmark
+  - pytest-cov
+  - pytest-asyncio
+  - pytest-timeout
+  - py7zr
+  - mistune
+  - markdown-it-py
+  - myst-parser
+  - python-frontmatter
+  - wordfreq
+  - nltk
+  - spacy
+  - stanza
+  - nicegui
+  - pandas
+  - polars
+  - pyarrow
+  - nanoarrow
+  - pyoxigraph
+  - llama.cpp
+  - llama-cpp-python
+  - tesseract
+  - pypdfium2
+  - dlt

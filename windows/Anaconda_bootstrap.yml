@@ -1,0 +1,15 @@
+name: dms
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.11
+  - conda
+  - mamba
+  - micromamba
+  - uv
+  - pipx
+  - git
+  - hatch
+  - ruff
+  - mypy
