@@ -46,9 +46,9 @@
 
 call :PARSE_ARGS %*
 if not "%ERRORLEVEL%"=="0" (
-  set "FINAL_EXIT_CODE=%ERRORLEVEL%"
-  echo {ERROR} Failed to parse arguments. Aborting...
-  goto :CLEANUP
+    set "FINAL_EXIT_CODE=%ERRORLEVEL%"
+    echo {ERROR} Failed to parse arguments. Aborting...
+    goto :CLEANUP
 )
 
 :: --- Escape sequence templates for color coded console output ---
@@ -68,9 +68,9 @@ set "EXIT_STATUS=1"
 :: --- Default Conda Prefix ---
 
 if defined _CONDA_PREFIX (
-  set "__CONDA_PREFIX=%_CONDA_PREFIX%"
+    set "__CONDA_PREFIX=%_CONDA_PREFIX%"
 ) else (
-  set "__CONDA_PREFIX=%~dp0Anaconda"
+    set "__CONDA_PREFIX=%~dp0Anaconda"
 )
 set "CONDA_BAT=%__CONDA_PREFIX%\condabin\conda.bat"
 set "MAMBA_BAT=%__CONDA_PREFIX%\condabin\mamba.bat"
@@ -80,30 +80,30 @@ set "MAMBA_BAT=%__CONDA_PREFIX%\condabin\mamba.bat"
 call :CHECK_DELAYED_EXPANSION
 if not "%ERRORLEVEL%"=="0" if defined _ARGS (
 
-  rem -- Delayed Expansion is disabled, running in non-interactive mode ---
-  
-  set "FINAL_EXIT_CODE=%ERRORLEVEL%"
-  echo %ERROR% Delayed Expansion is disabled while running in non-interactive mode. Aborting...
-  goto :CLEANUP
+    rem -- Delayed Expansion is disabled, running in non-interactive mode ---
+    
+    set "FINAL_EXIT_CODE=%ERRORLEVEL%"
+    echo %ERROR% Delayed Expansion is disabled while running in non-interactive mode. Aborting...
+    goto :CLEANUP
 ) else (
 
-  rem --- Delayed Expansion is disabled, running in interactive mode {no arguments supplied} ---
-  
-  setlocal EnableDelayedExpansion EnableExtensions
+    rem --- Delayed Expansion is disabled, running in interactive mode {no arguments supplied} ---
+    
+    setlocal EnableDelayedExpansion EnableExtensions
 )
 
 :: --- Determine cache directory ---
 
 if not defined _CACHE (
-  call :CACHE_DIR
-  set "EXIT_STATUS=!ERRORLEVEL!"
+    call :CACHE_DIR
+    set "EXIT_STATUS=!ERRORLEVEL!"
 ) else (
-  set "EXIT_STATUS=0"
+    set "EXIT_STATUS=0"
 )
 if not defined _CACHE (
-  echo %ERROR% Failed to set CACHE directory. Aborting...
-  set "FINAL_EXIT_CODE=1"
-  goto :CLEANUP
+    echo %ERROR% Failed to set CACHE directory. Aborting...
+    set "FINAL_EXIT_CODE=1"
+    goto :CLEANUP
 )
 echo:
 
@@ -111,16 +111,16 @@ echo:
 
 call :NO_ROOT_ENVIRONMENT
 if not "%ERRORLEVEL%"=="0" (
-  echo %ERROR% Aborting due to pre-existing Python/Conda environment.
-  set "FINAL_EXIT_CODE=%ERRORLEVEL%"
-  goto :CLEANUP
+    echo %ERROR% Aborting due to pre-existing Python/Conda environment.
+    set "FINAL_EXIT_CODE=%ERRORLEVEL%"
+    goto :CLEANUP
 )
 
 :: --- MS Build Tools ---
 
 if not exist "%~dp0msbuild.bat" (
-  echo %WARN% MSBUILD activation script not found: "%~dp0msbuild.bat". Skipping...
-  goto :MSBUILD_SKIP
+    echo %WARN% MSBUILD activation script not found: "%~dp0msbuild.bat". Skipping...
+    goto :MSBUILD_SKIP
 )
 call "%~dp0msbuild.bat" || (
     echo %ERROR% MSBuild activation failed. Aborting...
@@ -131,8 +131,8 @@ call "%~dp0msbuild.bat" || (
 :: --- Rename m2 link.exe, if present ---
 
 if exist "%__CONDA_PREFIX%\Library\usr\bin\link.exe" (
-  echo %INFO% Renaming m2 link.exe to link_.exe to resolve MSBuild clashing.
-  move "%__CONDA_PREFIX%\Library\usr\bin\link.exe" "%__CONDA_PREFIX%\Library\usr\bin\link_.exe"
+    echo %INFO% Renaming m2 link.exe to link_.exe to resolve MSBuild clashing.
+    move "%__CONDA_PREFIX%\Library\usr\bin\link.exe" "%__CONDA_PREFIX%\Library\usr\bin\link_.exe"
 )
 
 :: --- Have Python/setuptools/distutils use preactivated MS Build Tools environment. ---
@@ -146,19 +146,19 @@ call :COLOR_SCHEME
 :: --- Python.exe and conda.bat must exist in Conda environment ---
 
 if not exist "%__CONDA_PREFIX%\python.exe" (
-  echo %ERROR% Python not found: "%__CONDA_PREFIX%\python.exe". Aborting...
-  set "FINAL_EXIT_CODE=1"
-  goto :CLEANUP
+    echo %ERROR% Python not found: "%__CONDA_PREFIX%\python.exe". Aborting...
+    set "FINAL_EXIT_CODE=1"
+    goto :CLEANUP
 )
 if not exist "%CONDA_BAT%" (
-  echo %ERROR% Conda activation script not found: "%CONDA_BAT%". Aborting...
-  set "FINAL_EXIT_CODE=1"
-  goto :CLEANUP
+    echo %ERROR% Conda activation script not found: "%CONDA_BAT%". Aborting...
+    set "FINAL_EXIT_CODE=1"
+    goto :CLEANUP
 )
 if not exist "%MAMBA_BAT%" (
-  echo %ERROR% Conda activation script not found: "%MAMBA_BAT%". Aborting...
-  set "FINAL_EXIT_CODE=1"
-  goto :CLEANUP
+    echo %ERROR% Conda activation script not found: "%MAMBA_BAT%". Aborting...
+    set "FINAL_EXIT_CODE=1"
+    goto :CLEANUP
 )
 
 :: --- Activate Conda environment ---
@@ -167,24 +167,24 @@ echo:
 echo %WARN% Activating Conda PREFIX "%__CONDA_PREFIX%".
 call "%CONDA_BAT%" activate
 if not "%ERRORLEVEL%"=="0" (
-  set "FINAL_EXIT_CODE=%ERRORLEVEL%"
-  echo %ERROR% Conda environment activation failed. Aborting...
-  goto :CLEANUP
+    set "FINAL_EXIT_CODE=%ERRORLEVEL%"
+    echo %ERROR% Conda environment activation failed. Aborting...
+    goto :CLEANUP
 )
 if not defined CONDA_PREFIX (set "CONDA_PREFIX=%PYTHON_HOME%")
 if not defined CONDA_PREFIX (
-  echo %ERROR% Conda environment activation failed - Neither CONDA_PREFIX nor PYTHON_HOME is defined. Aborting...
-  set "FINAL_EXIT_CODE=1"
-  goto :CLEANUP
+    echo %ERROR% Conda environment activation failed - Neither CONDA_PREFIX nor PYTHON_HOME is defined. Aborting...
+    set "FINAL_EXIT_CODE=1"
+    goto :CLEANUP
 )
 if not exist "!CONDA_PREFIX!\python.exe" (
-  echo %ERROR% Conda environment activation failed - Python "!CONDA_PREFIX!\python.exe" not found. Aborting...
-  set "FINAL_EXIT_CODE=1"
-  goto :CLEANUP
+    echo %ERROR% Conda environment activation failed - Python "!CONDA_PREFIX!\python.exe" not found. Aborting...
+    set "FINAL_EXIT_CODE=1"
+    goto :CLEANUP
 )
 
 for /f "usebackq tokens=2" %%V in (`python --version`) do (
-  set "PYTHON_VERSION=%%V"
+    set "PYTHON_VERSION=%%V"
 )
 
 :: --- Activate JAVA ---
@@ -219,9 +219,9 @@ echo:
 :: --- Execute CLI, if defined ---
 
 if defined _ARG_CLI (
-  echo %INFO% Running "%_ARG_CLI%"
-  call :CLEANUP & (set "__CONDA_PREFIX=%__CONDA_PREFIX%") & (set "_ARG_CLI=%_ARG_CLI%")
-  call %_ARG_CLI% & goto :CLEANUP
+    echo %INFO% Running "%_ARG_CLI%"
+    call :CLEANUP & (set "__CONDA_PREFIX=%__CONDA_PREFIX%") & (set "_ARG_CLI=%_ARG_CLI%")
+    call %_ARG_CLI% & goto :CLEANUP
 )
 
 :: --- Use "/batch" to activate shell environment without starting FAR MANAGER ---
@@ -233,19 +233,19 @@ if defined _ARG_PREACTIVATE goto :CLEANUP
 
 call :CLEANUP
 for %%A in ("far.bat" "far.exe") do (
-  where /Q %%~A >nul 2>nul && (
-    set "_FARMANAGER=%%~A"
-    goto :START_FARMANAGER
-  )
+    where /Q %%~A >nul 2>nul && (
+        set "_FARMANAGER=%%~A"
+        goto :START_FARMANAGER
+    )
 )
 
 :START_FARMANAGER
 
 if defined _FARMANAGER (
-  cmd /E:ON /V:ON /C "%_FARMANAGER% ""%__CONDA_PREFIX%"""
-  set "_FARMANAGER="
+    cmd /E:ON /V:ON /C "%_FARMANAGER% ""%__CONDA_PREFIX%"""
+    set "_FARMANAGER="
 ) else (
-  cmd /E:ON /V:ON /K "cd ""%__CONDA_PREFIX%"""
+    cmd /E:ON /V:ON /K "cd ""%__CONDA_PREFIX%"""
 )
 
 goto :CLEANUP
@@ -264,15 +264,15 @@ goto :CLEANUP
 if defined _ARG_NOCOLOR set "NOCOLOR=1"
 if defined NO_COLOR set "NOCOLOR=1"
 if defined NOCOLOR (
-  set  "INFO= [INFO]  "
-  set  "OKOK= [-OK-]  "
-  set  "WARN= [WARN]  "
-  set "ERROR= [ERROR] "
+    set  "INFO= [INFO]  "
+    set  "OKOK= [-OK-]  "
+    set  "WARN= [WARN]  "
+    set "ERROR= [ERROR] "
 ) else (
-  set  "INFO=[100;92m [INFO]  [0m"
-  set  "OKOK=[103;94m [-OK-]  [0m"
-  set  "WARN=[106;35m [WARN]  [0m"
-  set "ERROR=[105;34m [ERROR] [0m"
+    set  "INFO=[100;92m [INFO]  [0m"
+    set  "OKOK=[103;94m [-OK-]  [0m"
+    set  "WARN=[106;35m [WARN]  [0m"
+    set "ERROR=[105;34m [ERROR] [0m"
 )
 
 exit /b 0
@@ -312,39 +312,39 @@ if /I "%__ARG1:~0,1%"=="--" (set "__ARG1=%__ARG1:~2%")
 echo {INFO} ~~~~~ Parsing "%__ARG1%" ~~~~~.
 
 if /I "%__ARG1%"=="batch" (
-  set "_ARG_BATCH=1"
-  echo {INFO} Using BATCH MODE.
-  shift
-  goto :PARSE_NEXT_ARG
+    set "_ARG_BATCH=1"
+    echo {INFO} Using BATCH MODE.
+    shift
+    goto :PARSE_NEXT_ARG
 )
 
 if /I "%__ARG1%"=="preactivate" (
-  set "_ARG_PREACTIVATE=1"
-  echo {INFO} Using PREACTIVATE MODE.
-  shift
-  goto :PARSE_NEXT_ARG
+    set "_ARG_PREACTIVATE=1"
+    echo {INFO} Using PREACTIVATE MODE.
+    shift
+    goto :PARSE_NEXT_ARG
 )
 
 if /I "%__ARG1%"=="nocolor" (
-  set "_ARG_NOCOLOR=1"
-  echo {INFO} Using basic monochrome console output.
-  shift
-  goto :PARSE_NEXT_ARG
+    set "_ARG_NOCOLOR=1"
+    echo {INFO} Using basic monochrome console output.
+    shift
+    goto :PARSE_NEXT_ARG
 )
 
 if /I "%__ARG1:~0,3%"=="cli" (
-  if "%__ARG1:~0,4%"=="cli=" (
-    set "_ARG_CLI=%__ARG1:~4%"
-  ) else (
-    set "_ARG_CLI=%__ARG2%" & shift
-  )
-  if "!_ARG_CLI!"=="" (
-    echo {ERROR} CLI argument cannot be parsed. Aborting...
-    exit /b 1
-  )
-  set "_ARG_BATCH=1"
-  shift
-  goto :PARSE_NEXT_ARG
+    if "%__ARG1:~0,4%"=="cli=" (
+        set "_ARG_CLI=%__ARG1:~4%"
+    ) else (
+        set "_ARG_CLI=%__ARG2%" & shift
+    )
+    if "!_ARG_CLI!"=="" (
+        echo {ERROR} CLI argument cannot be parsed. Aborting...
+        exit /b 1
+    )
+    set "_ARG_BATCH=1"
+    shift
+    goto :PARSE_NEXT_ARG
 )
 
 echo {WARN} Skipping unknown argument "%__ARG1%".
@@ -399,33 +399,33 @@ exit /b %FINAL_EXIT_CODE%
 :: --------------------------------------------------------
 echo:
 if exist "%~d0\Temp" (
-  set "TEMP=%~d0\Temp"
-  set "TMP=%~d0\Temp"
-  echo %INFO% TEMP: "!TEMP!"
-  echo %INFO% TMP:  "!TMP!"
+    set "TEMP=%~d0\Temp"
+    set "TMP=%~d0\Temp"
+    echo %INFO% TEMP: "!TEMP!"
+    echo %INFO% TMP:  "!TMP!"
 )
 
 :: --------------------------------------------------------
 :: Determine cache directory
 :: --------------------------------------------------------
 if exist "%_CACHE%" (
-  goto :CACHE_DIR_SET
+    goto :CACHE_DIR_SET
 )
 
 if exist "%~d0\Downloads" (
-  set "_CACHE=%~d0\Downloads"
+    set "_CACHE=%~d0\Downloads"
 ) else (
-  set "_CACHE=%USERPROFILE%\Downloads"
+    set "_CACHE=%USERPROFILE%\Downloads"
 )
 
 if exist "%_CACHE%\CACHE" (
-  set "_CACHE=%_CACHE%\CACHE"
-  goto :CACHE_DIR_SET
+    set "_CACHE=%_CACHE%\CACHE"
+    goto :CACHE_DIR_SET
 )
 
 if exist "%~d0\CACHE" (
-  set "_CACHE=%~d0\CACHE"
-  goto :CACHE_DIR_SET
+    set "_CACHE=%~d0\CACHE"
+    goto :CACHE_DIR_SET
 )
 
 :CACHE_DIR_SET
@@ -437,22 +437,22 @@ if exist "%_DUMMY%" (cmd /c rmdir /Q /S "%_DUMMY%")
 set "EXIT_STATUS=%ERRORLEVEL%"
 if exist "%_DUMMY%" (set "EXIT_STATUS=1")
 if not "!EXIT_STATUS!"=="0" (
-  echo %ERROR% Failed to delete test directory "%_DUMMY%".
-  echo %ERROR% Expected a full-access at this location "%_CACHE%".
-  echo %ERROR% Aborting...
-  set "_CACHE="
-  exit /b !EXIT_STATUS!
+    echo %ERROR% Failed to delete test directory "%_DUMMY%".
+    echo %ERROR% Expected a full-access at this location "%_CACHE%".
+    echo %ERROR% Aborting...
+    set "_CACHE="
+    exit /b !EXIT_STATUS!
 )
 
 md "%_DUMMY%"
 set "EXIT_STATUS=%ERRORLEVEL%"
 if not exist "%_DUMMY%" (set "EXIT_STATUS=1")
 if not "!EXIT_STATUS!"=="0" (
-  echo %ERROR% Failed to create test directory "%_DUMMY%".
-  echo %ERROR% Expected a full-access at this location "%_CACHE%".
-  echo %ERROR% Aborting...
-  set "_CACHE="
-  exit /b !EXIT_STATUS!
+    echo %ERROR% Failed to create test directory "%_DUMMY%".
+    echo %ERROR% Expected a full-access at this location "%_CACHE%".
+    echo %ERROR% Aborting...
+    set "_CACHE="
+    exit /b !EXIT_STATUS!
 )
 
 :: --------------------------------------------------------
@@ -461,15 +461,15 @@ if not "!EXIT_STATUS!"=="0" (
 set "_PKGS_DIR=%_CACHE%\Python\pkgs"
 
 if not defined CONDA_PKGS_DIRS (
-  set "CONDA_PKGS_DIRS=%_PKGS_DIR%"
+    set "CONDA_PKGS_DIRS=%_PKGS_DIR%"
 ) else (
-  set "_PKGS_DIR=%CONDA_PKGS_DIRS%"
+    set "_PKGS_DIR=%CONDA_PKGS_DIRS%"
 )
 if not exist "%CONDA_PKGS_DIRS%" md "%CONDA_PKGS_DIRS%"
 if not "%ERRORLEVEL%"=="0" (
-  echo %ERROR% Failed to create directory "%CONDA_PKGS_DIRS%".
-  set "_CACHE="
-  exit /b !EXIT_STATUS!
+    echo %ERROR% Failed to create directory "%CONDA_PKGS_DIRS%".
+    set "_CACHE="
+    exit /b !EXIT_STATUS!
 )
 
 :: --------------------------------------------------------
@@ -490,7 +490,7 @@ set "DST=%LOCALAPPDATA%\pip"
 if exist "%DST%" (cmd /c rmdir /S /Q "%DST%")
 mkdir "%DST%"
 mklink /j "%DST%\cache" "%SRC%" && (
-  echo %INFO% Profile pip cache dir is linked: "%DST%\cache".
+    echo %INFO% Profile pip cache dir is linked: "%DST%\cache".
 )
 
 set "SRC=%UV_CACHE_DIR%"
@@ -498,7 +498,7 @@ set "DST=%LOCALAPPDATA%\uv"
 if exist "%DST%" (cmd /c rmdir /S /Q "%DST%")
 mkdir "%DST%"
 mklink /j "%DST%\cache" "%SRC%" && (
-  echo %INFO% Profile uv cache dir is linked: "%DST%\cache".
+    echo %INFO% Profile uv cache dir is linked: "%DST%\cache".
 )
 
 :: --------------------------------------------------------
@@ -507,10 +507,10 @@ mklink /j "%DST%\cache" "%SRC%" && (
 
 set "GIT_CACHE=H:\GitHub"
 if not exist "%GIT_CACHE%" (
-  set "GIT_CACHE=%~d0\GitHub"
+    set "GIT_CACHE=%~d0\GitHub"
 )
 if not exist "%GIT_CACHE%" (
-  set "GIT_CACHE=%_CACHE%\GitHub"
+    set "GIT_CACHE=%_CACHE%\GitHub"
 )
 if not exist "%GIT_CACHE%" (mkdir "%GIT_CACHE%")
 echo %INFO% GIT_CACHE                directory: "%GIT_CACHE%".
@@ -571,15 +571,15 @@ echo %INFO% When running withhout arguments, the script is supposed to spawn
 echo %INFO% an activated shell, so Delayed Expansion can be enabled locally.
 echo:
 if "!ComSpec!"=="%ComSpec%" (
-  set "DELAYED_EXPANSION=1"
-  echo %INFO% --------------------------
-  echo %OKOK% CHECK PASSED
-  echo %INFO% Delayed Expansion enabled.
-  echo %INFO% --------------------------
-  echo:
-  exit /b 0
+    set "DELAYED_EXPANSION=1"
+    echo %INFO% --------------------------
+    echo %OKOK% CHECK PASSED
+    echo %INFO% Delayed Expansion enabled.
+    echo %INFO% --------------------------
+    echo:
+    exit /b 0
 ) else (
-  set "DELAYED_EXPANSION=0"
+    set "DELAYED_EXPANSION=0"
 )
 
 echo:
@@ -666,18 +666,18 @@ where "python.exe" 2>nul && (set "_PYTHON=python.exe")
 echo %INFO% Checking if Conda on the Path
 where "conda.bat" 2>nul && (set "_CONDA=conda.bat")
 if not defined _CONDA if not defined _PYTHON (
-  echo %OKOK% Python/Conda not detected.
-  set "_CONDA="
-  set "_PYTHON="
-  exit /b 0
+    echo %OKOK% Python/Conda not detected.
+    set "_CONDA="
+    set "_PYTHON="
+    exit /b 0
 )
 
 echo:
 if defined _PYTHON (
-  echo %WARN% Detected "python.exe" in Path.
+    echo %WARN% Detected "python.exe" in Path.
 )
 if defined _CONDA (
-  echo %WARN% Detected "conda.bat" in Path.
+    echo %WARN% Detected "conda.bat" in Path.
 )
 
 echo %WARN% It is strongly recommended to start this script from a clean
