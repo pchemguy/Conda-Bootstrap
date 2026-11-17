@@ -122,11 +122,10 @@ if not exist "%~dp0msbuild.bat" (
   echo %WARN% MSBUILD activation script not found: "%~dp0msbuild.bat". Skipping...
   goto :MSBUILD_SKIP
 )
-call "%~dp0msbuild.bat"
-if not "%ERRORLEVEL%"=="0" (
-  echo %ERROR% MSBuild activation failed. Aborting...
-  set "FINAL_EXIT_CODE=1"
-  goto :CLEANUP
+call "%~dp0msbuild.bat" || (
+    echo %ERROR% MSBuild activation failed. Aborting...
+    set "FINAL_EXIT_CODE=1"
+    goto :CLEANUP
 )
 
 :: --- Rename m2 link.exe, if present ---
