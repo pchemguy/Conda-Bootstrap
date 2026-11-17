@@ -48,7 +48,6 @@
 ::      - Colorized output can be disabled by defining NOCOLOR=1 or NO_COLOR=1.
 :: ============================================================================
 
-set "ERRORLEVEL="
 set "FINAL_EXIT_CODE=0"
 set "EXIT_STATUS=1"
 
