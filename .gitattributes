@@ -1,1 +1,2 @@
 windows/**/*.bat text eol=crlf
+linux/*.sh text eol=lf
