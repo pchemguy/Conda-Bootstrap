@@ -1,216 +1,233 @@
 @echo off
-rem Activate native x64 MSVC in the calling CMD session.
-rem See README.md for discovery order, environment variables, and exit codes.
 
-setlocal EnableExtensions DisableDelayedExpansion
-if /i "%~1"=="--msbuild-probe" goto :probe
+:: ============================================================================
+::  Purpose:
+::    Detects and activates Microsoft Build Tools (MSVC) environment if needed.
+::    This script is idempotent and can be safely re-run.
+::
+::  Behavior:
+::    - If MS Build Tools already active (VSINSTALLDIR set), exits successfully.
+::    - Otherwise, checks explicit env vars, custom paths, PATH, vswhere, and
+::      standard installation directories.
+::    - Activates 64-bit environment via vcvars64.bat when found.
+::
+::  Preconditions:
+::    - NOCOLOR: If set, gracefully falls back to no color.
+::    - Does NOT require DelayedExpansion in the caller's environment.
+::
+::  Exit codes:
+::    0 = success
+::    1 = activation failed or not found
+:: ============================================================================
 
-set "_MSBUILD_SELF=%~f0"
-set "_MSBUILD_CANDIDATE="
-if defined VCVARS (
-    for %%I in ("%VCVARS%") do set "_MSBUILD_CANDIDATE=%%~fI"
+call :COLOR_SCHEME
+
+echo:
+echo ====================================================================================
+echo ====================================================================================
+echo == %WARN%                                                                  %WARN% ==
+echo == %WARN%                     MS Build Tools Check                         %WARN% ==
+echo == %WARN%                                                                  %WARN% ==
+echo == %WARN% CLI: "%~f0" %*
+echo ====================================================================================
+echo ====================================================================================
+echo:
+
+set "EXIT_STATUS=1"
+set "_VCVARS="
+
+:: --- 1. Check if already activated ---
+
+echo %INFO% MSBuild: Checking if already activated...
+if defined VSINSTALLDIR if exist "%VSINSTALLDIR%\VC\Auxiliary\Build\vcvarsall.bat" (
+    echo %INFO% MSBuild: VSINSTALLDIR points to "%VSINSTALLDIR%".
+    echo %OKOK% MSBuild: Environment already active. Skipping activation.
+    set "EXIT_STATUS=0"
+    goto :MSBUILD_ACTIVATED
 )
 
-call :toolchain_ready && goto :already_ready
-if defined VSCMD_VER goto :incompatible_shell
-if defined VSCMD_ARG_HOST_ARCH goto :incompatible_shell
-if defined VSCMD_ARG_TGT_ARCH goto :incompatible_shell
-if defined VCINSTALLDIR goto :incompatible_shell
-if defined VCToolsInstallDir goto :incompatible_shell
+:: --- 2. Check explicit environment variables (VCVARS, BUILDTOOLS, MSBUILDTOOLS) ---
 
-if defined VCVARS (
-    call :try_candidate && goto :activate
-    call :log ERROR "VCVARS does not activate native x64 MSVC: %%VCVARS%%"
-    exit /b 1
+echo %INFO% MSBuild: Checking if VCVARS points to vcvarsall.bat.
+if defined VCVARS if exist "%VCVARS%" (
+    set "_VCVARS=%VCVARS%"
+    echo %INFO% MSBuild: VCVARS points to "%VCVARS%". Attempting activation...
+    goto :MSBUILD_ACTIVATION
 )
 
-for %%H in (BUILDTOOLS MSBUILDTOOLS) do (
-    call :search_hint %%H && goto :activate
+echo %INFO% MSBuild: Checking if BUILDTOOLS or MSBUILDTOOLS point to the "BuildTools" directory.
+if defined BUILDTOOLS if exist "%BUILDTOOLS%\VC\Auxiliary\Build\vcvarsall.bat" (
+    set "_VCVARS=%BUILDTOOLS%\VC\Auxiliary\Build\vcvarsall.bat"
+    goto :MSBUILD_ACTIVATION
+)
+if defined MSBUILDTOOLS if exist "%MSBUILDTOOLS%\VC\Auxiliary\Build\vcvarsall.bat" (
+    set "_VCVARS=%MSBUILDTOOLS%\VC\Auxiliary\Build\vcvarsall.bat"
+    goto :MSBUILD_ACTIVATION
 )
 
-set "_MSBUILD_NATIVE_PROGRAM_FILES=%ProgramW6432%"
-if not defined _MSBUILD_NATIVE_PROGRAM_FILES set "_MSBUILD_NATIVE_PROGRAM_FILES=%ProgramFiles%"
-set "_MSBUILD_X86_PROGRAM_FILES=%ProgramFiles(x86)%"
+:: --- 3. Check custom locations and junctions in dev ---
 
-call :search_registered && goto :activate
-
-for %%R in ("%_MSBUILD_NATIVE_PROGRAM_FILES%" "%_MSBUILD_X86_PROGRAM_FILES%" "%~dp0..") do (
-    if not "%%~R"=="" (
-        set "_MSBUILD_ROOT=%%~R\Microsoft Visual Studio"
-        call :search_visual_studio_root && goto :activate
+set "_MSVS=%~dp0..\Microsoft Visual Studio"
+echo %INFO% MSBuild: Checking for custom locations of VS editions in "%_MSVS%\{VERSION}\{KIND}".
+if exist "%_MSVS%" (
+    for /f "usebackq delims=" %%Y in (`dir /b /ad /O:-N "%_MSVS%" 2^>nul`) do (
+        for /d %%E in ("%_MSVS%\%%Y\*") do (
+            if exist "%%E\VC\Auxiliary\Build\vcvarsall.bat" (
+                set "_VCVARS=%%E\VC\Auxiliary\Build\vcvarsall.bat"
+                goto :MSBUILD_ACTIVATION
+            )
+        )
     )
 )
 
-call :search_path && goto :activate
-
-rem Check junctions in the repository, beside it, and on the script's drive.
-for %%R in ("%~dp0.." "%~dp0..\.." "%~d0\dev") do (
-    for %%J in (MSBuildTools BuildTools) do (
-        set "_MSBUILD_CANDIDATE=%%~R\%%J\VC\Auxiliary\Build\vcvarsall.bat"
-        call :try_candidate && goto :activate
-    )
-)
-
-call :log ERROR "No usable native x64 MSVC installation found. Set VCVARS to its vcvarsall.bat."
-exit /b 1
-
-:already_ready
-for %%I in ("%VSINSTALLDIR%\.") do set "_MSBUILD_ACTIVE_ROOT=%%~fI"
-for %%I in ("%VSINSTALLDIR%\VC\Auxiliary\Build\vcvarsall.bat") do set "_MSBUILD_ACTIVE_VCVARS=%%~fI"
-if defined VCVARS if /i not "%_MSBUILD_CANDIDATE%"=="%_MSBUILD_ACTIVE_VCVARS%" (
-    call :log ERROR "VCVARS selects a different installation from the active MSVC environment. Open a clean CMD session."
-    exit /b 1
-)
-call :log OK "Native x64 MSVC is already active at %%_MSBUILD_ACTIVE_ROOT%%."
-exit /b 0
-
-:incompatible_shell
-call :log ERROR "The current MSVC environment is incomplete or uses a different architecture. Open a clean CMD session."
-exit /b 1
-
-:search_hint
-if not defined %~1 exit /b 1
-setlocal EnableDelayedExpansion
-set "_MSBUILD_HINT=!%~1!"
-endlocal & set "_MSBUILD_CANDIDATE=%_MSBUILD_HINT%\VC\Auxiliary\Build\vcvarsall.bat"
-call :try_candidate && exit /b 0
-call :log WARN "Skipping unusable %~1 location: %%_MSBUILD_CANDIDATE%%"
-exit /b 1
-
-:search_registered
-set "_MSBUILD_INSTALLER_ROOT=%_MSBUILD_X86_PROGRAM_FILES%"
-if not defined _MSBUILD_INSTALLER_ROOT set "_MSBUILD_INSTALLER_ROOT=%_MSBUILD_NATIVE_PROGRAM_FILES%"
-if not defined _MSBUILD_INSTALLER_ROOT exit /b 1
-set "_MSBUILD_VSWHERE=%_MSBUILD_INSTALLER_ROOT%\Microsoft Visual Studio\Installer\vswhere.exe"
-if not exist "%_MSBUILD_VSWHERE%" exit /b 1
-for /f "usebackq delims=" %%I in (`call "%_MSBUILD_VSWHERE%" -nologo -sort -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do (
-    set "_MSBUILD_CANDIDATE=%%I\VC\Auxiliary\Build\vcvarsall.bat"
-    call :try_candidate && exit /b 0
-)
-exit /b 1
-
-:search_visual_studio_root
-if not exist "%_MSBUILD_ROOT%\." exit /b 1
-for /f "delims=" %%V in ('dir /b /ad /o:-n "%_MSBUILD_ROOT%" 2^>nul') do (
-    for /d %%I in ("%_MSBUILD_ROOT%\%%V\*") do (
-        set "_MSBUILD_CANDIDATE=%%I\VC\Auxiliary\Build\vcvarsall.bat"
-        call :try_candidate && exit /b 0
-    )
-)
-exit /b 1
-
-:search_path
-set "_MSBUILD_PATH=%PATH:"=%"
-for %%D in ("%_MSBUILD_PATH:;=" "%") do (
-    set "_MSBUILD_ROOT=%%~D"
-    call :search_path_root && exit /b 0
-)
-exit /b 1
-
-:search_path_root
-if not "%_MSBUILD_ROOT:~1,2%"==":\" if not "%_MSBUILD_ROOT:~1,2%"==":/" if not "%_MSBUILD_ROOT:~0,2%"=="\\" exit /b 1
-for %%I in (
-    "%_MSBUILD_ROOT%\vcvarsall.bat"
-    "%_MSBUILD_ROOT%\VC\Auxiliary\Build\vcvarsall.bat"
-    "%_MSBUILD_ROOT%\BuildTools\VC\Auxiliary\Build\vcvarsall.bat"
+echo %INFO% MSBuild: Checking custom fallback locations for BuildTools.
+for %%D in (
+    "%~dp0..\MSBuildTools"
+    "%~dp0..\BuildTools"
+    "%~d0\dev\MSBuildTools"
+    "%~d0\dev\BuildTools"
 ) do (
-    set "_MSBUILD_CANDIDATE=%%~I"
-    call :try_candidate && exit /b 0
-)
-exit /b 1
-
-:try_candidate
-if not exist "%_MSBUILD_CANDIDATE%" exit /b 1
-if exist "%_MSBUILD_CANDIDATE%\" exit /b 1
-for %%I in ("%_MSBUILD_CANDIDATE%") do set "_MSBUILD_CANDIDATE=%%~fI"
-rem Changes from a failed vendor script stay in the child CMD session.
-"%ComSpec%" /d /e:on /v:off /s /c ""%%_MSBUILD_SELF%%" --msbuild-probe" >nul 2>&1 && exit /b 0
-call :log WARN "Skipping an installation that failed native x64 activation: %%_MSBUILD_CANDIDATE%%"
-exit /b 1
-
-:probe
-set "VSINSTALLDIR="
-set "VSCMD_SKIP_SENDTELEMETRY=1"
-call "%%_MSBUILD_CANDIDATE%%" amd64 || exit /b 1
-call :toolchain_ready && exit /b 0
-exit /b 1
-
-:activate
-rem Use an unused variable so CALL can expand the path on its second parse.
-set "_MSBUILD_HANDOFF=_CONDA_BOOTSTRAP_VCVARS"
-:choose_handoff
-if defined %_MSBUILD_HANDOFF% (
-    set "_MSBUILD_HANDOFF=_%_MSBUILD_HANDOFF%"
-    goto :choose_handoff
-)
-for %%I in ("%_MSBUILD_CANDIDATE%") do (
-    endlocal
-    set "%_MSBUILD_HANDOFF%=%%~I"
-    call :activate_in_caller %_MSBUILD_HANDOFF%
-    if errorlevel 1 (
-        set "%_MSBUILD_HANDOFF%="
-        exit /b 1
-    )
-    set "%_MSBUILD_HANDOFF%="
-)
-exit /b 0
-
-:activate_in_caller
-if defined VSCMD_SKIP_SENDTELEMETRY goto :run_activation
-set "VSCMD_SKIP_SENDTELEMETRY=1"
-call :run_activation %~1 && (
-    set "VSCMD_SKIP_SENDTELEMETRY="
-    exit /b 0
-)
-set "VSCMD_SKIP_SENDTELEMETRY="
-exit /b 1
-
-:run_activation
-call :log INFO "Activating native x64 MSVC with %%%~1%%"
-rem Discovery runs here only in a shell without an active MSVC environment.
-set "VSINSTALLDIR="
-call "%%%~1%%" amd64 || (
-    call :log ERROR "vcvarsall.bat returned a failure: %%%~1%%"
-    exit /b 1
-)
-call :toolchain_ready || (
-    call :log ERROR "The native x64 toolchain did not pass validation after running %%%~1%%"
-    exit /b 1
-)
-call :log OK "Native x64 MSVC is active."
-exit /b 0
-
-:toolchain_ready
-setlocal EnableExtensions EnableDelayedExpansion
-if not defined VSINSTALLDIR exit /b 1
-if not defined VCToolsInstallDir exit /b 1
-if /i not "%VSCMD_ARG_HOST_ARCH%"=="x64" if /i not "%VSCMD_ARG_HOST_ARCH%"=="amd64" exit /b 1
-if /i not "%VSCMD_ARG_TGT_ARCH%"=="x64" if /i not "%VSCMD_ARG_TGT_ARCH%"=="amd64" exit /b 1
-for %%I in ("%VCToolsInstallDir%\bin\Hostx64\x64") do set "_MSBUILD_BIN=%%~fI"
-for %%T in (cl.exe link.exe) do (
-    set "_MSBUILD_RESOLVED=%%~$PATH:T"
-    if not defined NoDefaultCurrentDirectoryInExePath if exist "%%T" set "_MSBUILD_RESOLVED=%%~fT"
-    if not defined _MSBUILD_RESOLVED exit /b 1
-    for %%I in ("!_MSBUILD_RESOLVED!") do (
-        if /i not "%%~fI"=="!_MSBUILD_BIN!\%%T" exit /b 1
+    if exist "%%~D\VC\Auxiliary\Build\vcvarsall.bat" (
+        set "_VCVARS=%%~D\VC\Auxiliary\Build\vcvarsall.bat"
+        goto :MSBUILD_ACTIVATION
     )
 )
-exit /b 0
 
-:log
-setlocal EnableExtensions DisableDelayedExpansion
-set "_MSBUILD_MESSAGE=%~2"
-set "_MSBUILD_PREFIX=[%~1]"
-if not defined NOCOLOR if not defined NO_COLOR (
-    if /i "%~1"=="INFO" set "_MSBUILD_PREFIX=[100;92m [INFO] [0m"
-    if /i "%~1"=="OK" set "_MSBUILD_PREFIX=[103;94m [-OK-] [0m"
-    if /i "%~1"=="WARN" set "_MSBUILD_PREFIX=[106;35m [WARN] [0m"
-    if /i "%~1"=="ERROR" set "_MSBUILD_PREFIX=[105;34m [ERROR] [0m"
+:: --- 4. Check PATH for vcvarsall.bat or BuildTools ---
+
+echo %INFO% MSBuild: Checking if vcvarsall.bat is on the PATH.
+for /f "usebackq tokens=* delims=" %%A in (`where vcvarsall.bat 2^>nul`) do (
+    if exist "%%~A" (
+        set "_VCVARS=%%~A"
+        echo %INFO% MSBuild: Found vcvarsall.bat on the PATH: "%%~A". Attempting activation...
+        goto :MSBUILD_ACTIVATION
+    )
 )
-setlocal EnableDelayedExpansion
-if /i "%~1"=="ERROR" (
-    >&2 echo !_MSBUILD_PREFIX! MSBuild: !_MSBUILD_MESSAGE!
+
+echo %INFO% MSBuild: Checking if "BuildTools" or its parent are on the PATH.
+if defined Path (
+    set "_PATH=%Path:"=%"
+    set "_PATH="%_PATH:;=";"%""
+    for %%A in (%_PATH%) do (
+        if not "%%~A"=="" (
+            if exist "%%~A\VC\Auxiliary\Build\vcvarsall.bat" (
+                set "_VCVARS=%%~A\VC\Auxiliary\Build\vcvarsall.bat"
+                goto :MSBUILD_ACTIVATION
+            )
+            if exist "%%~A\BuildTools\VC\Auxiliary\Build\vcvarsall.bat" (
+                set "_VCVARS=%%~A\BuildTools\VC\Auxiliary\Build\vcvarsall.bat"
+                goto :MSBUILD_ACTIVATION
+            )
+        )
+    )
+)
+
+:: --- 5. Query vswhere.exe if available ---
+
+set "_VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
+if exist "%_VSWHERE%" (
+    echo %INFO% MSBuild: Querying vswhere.exe for latest Visual Studio with C++ tools.
+    for /f "usebackq delims=" %%I in (`"%_VSWHERE%" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath 2^>nul`) do (
+        if exist "%%I\VC\Auxiliary\Build\vcvarsall.bat" (
+            set "_VCVARS=%%I\VC\Auxiliary\Build\vcvarsall.bat"
+            goto :MSBUILD_ACTIVATION
+        )
+    )
+)
+
+:: --- 6. Check default locations of VS editions (64-bit and 32-bit Program Files) ---
+
+for %%P in ("%ProgramFiles%\Microsoft Visual Studio" "%ProgramFiles(x86)%\Microsoft Visual Studio") do (
+    echo %INFO% MSBuild: Checking for default locations of VS editions in "%%~P\{VERSION}\{KIND}".
+    if exist "%%~P" (
+        for /f "usebackq delims=" %%Y in (`dir /b /ad /O:-N "%%~P" 2^>nul`) do (
+            for /d %%E in ("%%~P\%%Y\*") do (
+                if exist "%%E\VC\Auxiliary\Build\vcvarsall.bat" (
+                    set "_VCVARS=%%E\VC\Auxiliary\Build\vcvarsall.bat"
+                    goto :MSBUILD_ACTIVATION
+                )
+            )
+        )
+    )
+)
+
+:: --- MSBuildTools not found ---
+
+set "EXIT_STATUS=1"
+echo %ERROR% MSBuild: MS Build Tools activation script not found.
+echo %ERROR% MSBuild: If MS Build Tools are installed, either
+echo %ERROR% MSBuild:   - start this script from a preactivated MS Build Tools shell
+echo %ERROR% MSBuild:   - see script notes above regarding checked locations and variables
+echo %ERROR% MSBuild: See this accepted SO answer https://stackoverflow.com/a/64262038/17472988
+echo %ERROR% MSBuild: regarding MS Build Tools installation.
+echo:
+goto :MSBUILD_ACTIVATED
+
+:MSBUILD_ACTIVATION
+
+:: --- MSBuildTools found ---
+
+if not exist "%_VCVARS:all.bat=64.bat%" (
+    echo %ERROR% MSBuild: 64-bit activation script not found at "%_VCVARS:all.bat=64.bat%".
+    set "EXIT_STATUS=1"
+    goto :MSBUILD_ACTIVATED
+)
+
+set "VSCMD_SKIP_SENDTELEMETRY=1"
+echo:
+echo %WARN% MSBuild: Activating MS Build Tools.
+echo %INFO% MSBuild: Calling "%_VCVARS:all.bat=64.bat%"
+echo:
+call "%_VCVARS:all.bat=64.bat%"
+set "EXIT_STATUS=%ERRORLEVEL%"
+echo:
+if not "%EXIT_STATUS%"=="0" (
+    echo %ERROR% MSBuild: vcvars64.bat returned an error.
+    set "EXIT_STATUS=1"
+    goto :MSBUILD_ACTIVATED
+)
+
+if not defined VSINSTALLDIR (
+    echo %ERROR% MSBuild: Activation returned success, but VSINSTALLDIR is missing. Aborting...
+    set "EXIT_STATUS=1"
+    goto :MSBUILD_ACTIVATED
+)
+
+if exist "%VSINSTALLDIR%\VC\Auxiliary\Build\vcvarsall.bat" (
+    set "EXIT_STATUS=0"
+    echo %OKOK% MSBuild: MS Build Tools activation succeeded.
+    echo %OKOK% MSBuild: VSINSTALLDIR points to "%VSINSTALLDIR%".
 ) else (
-    echo !_MSBUILD_PREFIX! MSBuild: !_MSBUILD_MESSAGE!
+    set "EXIT_STATUS=1"
+    echo %ERROR% MSBuild: MS Build Tools activation failed.
+    echo %ERROR% MSBuild: Used script "%_VCVARS:all.bat=64.bat%".
+)
+
+:MSBUILD_ACTIVATED
+
+set "INFO="
+set "OKOK="
+set "WARN="
+set "ERROR="
+set "_MSVS="
+set "_VCVARS="
+set "_PATH="
+set "_VSWHERE="
+set "EXIT_STATUS=" & exit /b %EXIT_STATUS%
+
+
+:: ============================================================================ COLOR_SCHEME BEGIN
+:COLOR_SCHEME
+if defined NOCOLOR (
+    set  "INFO= [INFO]  "
+    set  "OKOK= [-OK-]  "
+    set  "WARN= [WARN]  "
+    set "ERROR= [ERROR] "
+) else (
+    set  "INFO=[100;92m [INFO]  [0m"
+    set  "OKOK=[103;94m [-OK-]  [0m"
+    set  "WARN=[106;35m [WARN]  [0m"
+    set "ERROR=[105;34m [ERROR] [0m"
 )
 exit /b 0
+:: ============================================================================ COLOR_SCHEME END
