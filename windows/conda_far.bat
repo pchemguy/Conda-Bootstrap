@@ -1,14 +1,51 @@
 @echo off
 
 :: ============================================================================
-:: Activate an existing Windows Python/Conda environment and load local configs.
-:: Use a clean CMD session. Any argument requires caller delayed expansion.
-:: With no arguments, launch FAR Manager or an interactive CMD at the prefix.
-:: /batch and /preactivate return to the caller after setup.
-:: /cli "command" runs one command in the activated environment.
-:: /nocolor or NOCOLOR selects plain text diagnostics.
-:: Returns the setup, command, or child shell status.
-:: See conda_far.md for workflows, configuration, and filesystem changes.
+::  Purpose:
+::    Orchestrates initialization and activation of a minimal Conda-based
+::    development environment for Windows-based builds.
+::
+::  Description:
+::    This script serves as the main entry point for environment activation
+::    and dependency management. It guarantees that:
+::      - cmd.exe Delayed Expansion is enabled
+::      - The shell is free from preactivated Python/Conda contexts
+::
+::  Invocation Modes:
+::      /batch        - Activates environment variables only; does not launch
+::                      FAR Manager or start a new interactive shell.
+::
+::      /preactivate  - Performs environment pre-initialization and preserves
+::                      _CACHE, CONDA_BAT, and MAMBA_BAT for bootstrap scripts.
+::
+::      /cache        - Verifies shell cleanliness, initializes cache
+::                      directories and junctions only, preserves _CACHE, and
+::                      exits before checking or activating Conda/MSBuild.
+::
+::      /cli="[CLI]"  - Executes provided CLI in the /batch mode.
+::
+::      (no argument) - Activates full environment and launches FAR Manager
+::                      (if detected) or opens a regular cmd.exe session.
+::
+::  Behavioral Summary:
+::      1. Verifies cmd.exe configuration and base environment cleanliness.
+::      2. Validates target Conda installation files (unless /cache is set).
+::      3. Configures cache directories and profile cache junctions.
+::      4. Activates MS Build Tools environment or notifies user of failure.
+::      5. Ensures Conda (or Micromamba) environment readiness.
+::      6. Sequentially activates extra config_*.bat environment scripts.
+::      7. Exposes DISTUTILS_USE_SDK=1 to enable setuptools to reuse the
+::         existing MSVC environment instead of launching new compiler shells.
+::      8. Starts FAR Manager if available, or leaves the user in a prepared
+::         cmd.exe session.
+::
+::  Exit Codes:
+::      0   - Success
+::      1+  - Failure during activation (refer to last console output)
+::
+::  Notes:
+::      - Requires Windows 10+ with ANSI color output support.
+::      - Colorized output can be disabled by defining NOCOLOR=1 or NO_COLOR=1.
 :: ============================================================================
 
 set "ERRORLEVEL="
@@ -40,7 +77,7 @@ echo %WARN% CLI: "%~f0" %*
 echo ==========================================================================
 echo:
 
-:: --- Select the target prefix and activation wrappers ---
+:: --- Default Conda Prefix ---
 
 if defined _CONDA_PREFIX (
     set "__CONDA_PREFIX=%_CONDA_PREFIX:"=%"
@@ -50,7 +87,7 @@ if defined _CONDA_PREFIX (
 set "CONDA_BAT=%__CONDA_PREFIX%\condabin\conda.bat"
 set "MAMBA_BAT=%__CONDA_PREFIX%\condabin\mamba.bat"
 
-:: --- Require caller delayed expansion with arguments or enable it locally ---
+:: --- Make sure cmd.exe delayed expansion is enabled by default ---
 
 call :CHECK_DELAYED_EXPANSION
 if not "%ERRORLEVEL%"=="0" (
@@ -64,7 +101,7 @@ if not "%ERRORLEVEL%"=="0" (
     setlocal EnableDelayedExpansion EnableExtensions
 )
 
-:: --- Check for an active Conda prefix or visible Python/Conda commands ---
+:: --- Base / Root environment guard (fail fast before modifying disk) ---
 
 call :NO_ROOT_ENVIRONMENT
 if not "%ERRORLEVEL%"=="0" (
@@ -73,25 +110,27 @@ if not "%ERRORLEVEL%"=="0" (
     goto :CLEANUP
 )
 
-:: --- Check required prefix files before cache setup or linker renaming ---
+:: --- Validate target Conda installation files unless running in /cache mode ---
 
-if not exist "%__CONDA_PREFIX%\python.exe" (
-    echo %ERROR% Python not found: "%__CONDA_PREFIX%\python.exe". Aborting...
-    set "FINAL_EXIT_CODE=1"
-    goto :CLEANUP
-)
-if not exist "%CONDA_BAT%" (
-    echo %ERROR% Conda activation script not found: "%CONDA_BAT%". Aborting...
-    set "FINAL_EXIT_CODE=1"
-    goto :CLEANUP
-)
-if not exist "%MAMBA_BAT%" (
-    echo %ERROR% Mamba activation script not found: "%MAMBA_BAT%". Aborting...
-    set "FINAL_EXIT_CODE=1"
-    goto :CLEANUP
+if not defined _ARG_CACHE (
+    if not exist "%__CONDA_PREFIX%\python.exe" (
+        echo %ERROR% Python not found: "%__CONDA_PREFIX%\python.exe". Aborting...
+        set "FINAL_EXIT_CODE=1"
+        goto :CLEANUP
+    )
+    if not exist "%CONDA_BAT%" (
+        echo %ERROR% Conda activation script not found: "%CONDA_BAT%". Aborting...
+        set "FINAL_EXIT_CODE=1"
+        goto :CLEANUP
+    )
+    if not exist "%MAMBA_BAT%" (
+        echo %ERROR% Mamba activation script not found: "%MAMBA_BAT%". Aborting...
+        set "FINAL_EXIT_CODE=1"
+        goto :CLEANUP
+    )
 )
 
-:: --- Configure tool caches and profile cache junctions ---
+:: --- Determine cache directory ---
 
 call :CACHE_DIR
 set "EXIT_STATUS=%ERRORLEVEL%"
@@ -106,6 +145,14 @@ if not defined _CACHE (
     goto :CLEANUP
 )
 echo:
+
+:: --- Exit early if /cache mode was requested ---
+
+if defined _ARG_CACHE (
+    echo %OKOK% Cache configuration completed.
+    set "FINAL_EXIT_CODE=0"
+    goto :CLEANUP
+)
 
 :: --- Rename m2 link.exe before MSBuild check, if present ---
 
@@ -186,7 +233,7 @@ if not defined PYTHON_VERSION (
     goto :CLEANUP
 )
 
-:: --- Set JAVA_HOME when a bundled JVM is present ---
+:: --- Activate JAVA ---
 
 if not defined JAVA_HOME (
     if exist "%CONDA_PREFIX%\Library\lib\jvm\bin\server\jvm.dll" (
@@ -198,7 +245,7 @@ if not defined JAVA_HOME (
 
 echo %OKOK% Conda activation succeeded (Python %PYTHON_VERSION%).
 
-:: --- Run optional config_*.bat files from the script directory ---
+:: --- Activate Extra Environment Settings ---
 
 echo:
 echo %INFO% ========== Loading Configs ==========
@@ -232,7 +279,7 @@ if defined _ARG_PREACTIVATE (
     goto :CLEANUP
 )
 
-:: --- Try far.bat, then far.exe, then an interactive CMD ---
+:: --- Start FAR MANAGER ---
 
 set "_FARMANAGER="
 for %%A in ("far.bat" "far.exe") do if not defined _FARMANAGER (
@@ -279,7 +326,7 @@ goto :CLEANUP
 :: ============================================================================
 :COLOR_SCHEME
 :: ---------------------------------------------------------------------
-:: Set diagnostic prefixes and honor /nocolor, NOCOLOR, and NO_COLOR.
+:: Color Scheme (with NOCOLOR fallback)
 :: ---------------------------------------------------------------------
 
 if defined _ARG_NOCOLOR set "NOCOLOR=1"
@@ -303,8 +350,9 @@ exit /b 0
 
 :: ============================================================================ PARSE_ARGS BEGIN
 :: ============================================================================
-:: Parse mode and color options. Shift arguments in this subroutine so the
-:: top-level %0 continues to refer to the script.
+:: --- Parse arguments ---
+:: Because "shift" destroys %0, original context is preserved by calling this
+:: as a subroutine.
 
 :PARSE_ARGS
 
@@ -317,6 +365,7 @@ if not "%~1"=="" set "_ARGS=TRUE"
 
 set "_ARG_BATCH="
 set "_ARG_PREACTIVATE="
+set "_ARG_CACHE="
 set "_ARG_NOCOLOR="
 set "_ARG_CLI="
 
@@ -352,6 +401,13 @@ if /I "%__ARG1%"=="batch" (
 if /I "%__ARG1%"=="preactivate" (
     set "_ARG_PREACTIVATE=1"
     echo %INFO% Using PREACTIVATE MODE.
+    shift
+    goto :PARSE_NEXT_ARG
+)
+
+if /I "%__ARG1%"=="cache" (
+    set "_ARG_CACHE=1"
+    echo %INFO% Using CACHE-ONLY MODE.
     shift
     goto :PARSE_NEXT_ARG
 )
@@ -401,9 +457,10 @@ exit /b 0
 
 :: ============================================================================ CLEANUP BEGIN
 :: ============================================================================
-:: Set FINAL_EXIT_CODE and jump to CLEANUP to return the script status.
-:: CLEAR_VARS also runs before a command or child shell starts. It leaves
-:: CONDA_BAT and MAMBA_BAT available to callers such as Anaconda.bat.
+:: --- Clean up; prefer as the primary script exit point ---
+:: To exit script, set FINAL_EXIT_CODE and goto CLEANUP
+:: Note: CONDA_BAT and MAMBA_BAT are preserved for callers such as Anaconda.bat,
+:: and _CACHE is preserved when /cache or /preactivate is used.
 
 :CLEANUP
 call :CLEAR_VARS
@@ -411,14 +468,15 @@ if not defined FINAL_EXIT_CODE set "FINAL_EXIT_CODE=0"
 set "FINAL_EXIT_CODE=" & exit /b %FINAL_EXIT_CODE%
 
 :CLEAR_VARS
+if not defined _ARG_CACHE if not defined _ARG_PREACTIVATE set "_CACHE="
 set "_ARGS="
 set "_ARG_BATCH="
 set "_ARG_PREACTIVATE="
+set "_ARG_CACHE="
 set "_ARG_NOCOLOR="
 set "_ARG_CLI="
 set "__ARG1="
 set "__ARG2="
-set "_CACHE="
 set "_PKGS_DIR="
 set "_CONDA_EXE="
 set "_CONDA_ROOT="
@@ -440,8 +498,6 @@ exit /b 0
 :: ============================================================================ CACHE_DIR BEGIN
 :: ============================================================================
 :CACHE_DIR
-:: Set cache paths, create missing directories, and replace profile cache paths
-:: with junctions. Return 1 if a required filesystem operation fails.
 :: --------------------------------------------------------
 :: Temp directory
 :: --------------------------------------------------------
@@ -701,8 +757,16 @@ exit /b 0
 :: ============================================================================
 :CHECK_DELAYED_EXPANSION
 ::
-:: Set DELAYED_EXPANSION to 1 when CMD expands !ComSpec! and to 0 otherwise.
-:: Return 0 when delayed expansion is enabled or 1 when disabled.
+:: Purpose:
+::   Checks if Delayed Expansion is enabled.
+::
+:: Return:
+::   DELAYED_EXPANSION=1 - Enabled
+::   DELAYED_EXPANSION=0 - Disabled
+::
+:: Exit Codes:
+::   0 - Enabled
+::   1 - Disabled
 
 echo:
 echo %WARN% Checking cmd.exe delayed expansion availability
@@ -772,8 +836,8 @@ exit /b 1
 :: --------------------------------------------------------
 :: NO_ROOT_ENVIRONMENT
 ::
-:: Return 1 if CONDA_PREFIX is set or WHERE finds python.exe or conda.bat.
-:: WHERE checks the working directory and PATH. Return 0 if none is found.
+:: Rejects execution from any shell where Python or Conda is already active or
+:: exposed on PATH to prevent header/library contamination during builds.
 :: --------------------------------------------------------
 :NO_ROOT_ENVIRONMENT
 
