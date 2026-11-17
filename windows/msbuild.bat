@@ -194,11 +194,11 @@ if not "%ERRORLEVEL%"=="0" (
 )
 echo:
 
-call :VERIFY_X64_ACTIVE
-if not "%ERRORLEVEL%"=="0" (
+set "EXIT_STATUS=1"
+call :VERIFY_X64_ENV && call :VERIFY_MS_LINKER && set "EXIT_STATUS=0"
+if not "%EXIT_STATUS%"=="0" (
     echo %ERROR% MSBuild: MS Build Tools activation failed verification.
     echo %ERROR% MSBuild: Used script "%_VCVARS%".
-    set "EXIT_STATUS=1"
     goto :MSBUILD_ACTIVATED
 )
 
@@ -247,17 +247,6 @@ for /f "usebackq delims=" %%Y in (`dir /b /ad /O:-N "%~1" 2^>nul`) do (
 )
 if defined _VCVARS exit /b 0
 exit /b 1
-
-:VERIFY_X64_ACTIVE
-call :VERIFY_X64_ENV
-if not "%ERRORLEVEL%"=="0" (
-    exit /b 1
-)
-call :VERIFY_MS_LINKER
-if not "%ERRORLEVEL%"=="0" (
-    exit /b 1
-)
-exit /b 0
 
 :VERIFY_X64_ENV
 if not defined VSINSTALLDIR (
