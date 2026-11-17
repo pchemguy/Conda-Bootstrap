@@ -121,7 +121,7 @@ exit /b 1
 
 :try_candidate
 if not exist "%_MSBUILD_CANDIDATE%" exit /b 1
-if exist "%_MSBUILD_CANDIDATE%\." exit /b 1
+if exist "%_MSBUILD_CANDIDATE%\" exit /b 1
 for %%I in ("%_MSBUILD_CANDIDATE%") do set "_MSBUILD_CANDIDATE=%%~fI"
 rem Changes from a failed vendor script stay in the child CMD session.
 "%ComSpec%" /d /e:on /v:off /s /c ""%%_MSBUILD_SELF%%" --msbuild-probe" >nul 2>&1 && exit /b 0
