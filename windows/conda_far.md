@@ -31,7 +31,7 @@ From a batch file run from the repository root:
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 call windows\conda_far.bat /batch
-if errorlevel 1 exit /b 1
+if not "%ERRORLEVEL%"=="0" exit /b 1
 python.exe --version
 ```
 
