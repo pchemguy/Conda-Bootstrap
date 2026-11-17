@@ -12,7 +12,8 @@ url: https://chatgpt.com/c/6af71f9b-3910-83ed-ac12-14f7f70fc929
 
 Conda Bootstrap develops shell scripts that use [micromamba](https://github.com/mamba-org/micromamba-releases) to bootstrap Python environments.
 
-Use `cmd.exe` (CMD) for Windows commands and scripts. Use Bash for Linux commands and scripts. PowerShell is unavailable on the Windows target. All PowerShell variants and PowerShell syntax are prohibited.
+- **Windows**: use `cmd.exe` (CMD) commands and scripts; place in `windows/`. PowerShell is unavailable on the Windows target. All PowerShell variants and PowerShell syntax are prohibited.
+- **Linux**: use Bash for Linux commands and scripts; place in  `linux/`.
 
 ### Repository and GitHub access
 
