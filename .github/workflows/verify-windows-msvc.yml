@@ -17,7 +17,34 @@ jobs:
       run:
         shell: cmd
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
+      - name: Diagnose candidate and child probe
+        env:
+          NOCOLOR: '1'
+        run: |
+          @echo off
+          set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
+          "%VSWHERE%" -nologo -sort -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          for /f "usebackq delims=" %%I in (`call "%VSWHERE%" -nologo -sort -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "VCVARS=%%I\VC\Auxiliary\Build\vcvarsall.bat"
+          if not defined VCVARS exit /b 20
+          echo Candidate: "%VCVARS%"
+          if exist "%VCVARS%" echo File exists
+          if exist "%VCVARS%\." echo With dot exists
+          if exist "%VCVARS%\" echo With trailing slash exists
+          set "_MSBUILD_SELF=%CD%\windows\msbuild.bat"
+          set "_MSBUILD_CANDIDATE=%VCVARS%"
+          "%ComSpec%" /d /e:on /v:off /s /c ""%%_MSBUILD_SELF%%" --msbuild-probe"
+          echo Child probe status: %ERRORLEVEL%
+          call "%VCVARS%" amd64
+          echo Vendor activation status: %ERRORLEVEL%
+          set VSCMD_ARG_HOST_ARCH
+          set VSCMD_ARG_TGT_ARCH
+          set VCToolsInstallDir
+          where cl.exe
+          where link.exe
+          call windows\msbuild.bat
+          echo Wrapper after direct activation status: %ERRORLEVEL%
+          exit /b 0
       - name: Activate and build with MSVC
         env:
           NOCOLOR: '1'
@@ -39,6 +66,7 @@ jobs:
           if errorlevel 1 exit /b 8
           exit /b 0
       - name: Activate from explicit script path
+        if: always()
         env:
           NOCOLOR: '1'
         run: |
