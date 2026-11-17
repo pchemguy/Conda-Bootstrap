@@ -16,7 +16,7 @@ From another batch file beside `msbuild.bat`, use the script directory and check
 
 ```bat
 call "%~dp0msbuild.bat"
-if errorlevel 1 exit /b 1
+if not "%ERRORLEVEL%"=="0" exit /b 1
 ```
 
 | Return code | Meaning |
@@ -61,11 +61,9 @@ The architecture check uses the target architecture. Compiler verification is ba
 ## Troubleshoot activation
 
 - **Activation script missing.** Check that the Visual Studio C++ tools are installed. For a custom installation, set `VCVARS` to the full path to its `vcvars64.bat` or set `BUILDTOOLS` to the installation root.
-- **Linker collision.** Run `where.exe link.exe` and `where.exe cl.exe` in the same CMD session. If Git, MSYS, or another toolchain supplies the first linker, start a clean CMD session or adjust the directory or `PATH` order so that CMD finds the Microsoft linker from the same directory as the compiler.
+- **Linker collision.** Run `where.exe link.exe` and `where.exe cl.exe` in the same CMD session. If Git, MSYS, or another toolchain supplies the first `linker.exe`, rename offending `linker.exe`, if acceptable, or adjust the directory or `PATH` order so that CMD finds the Microsoft linker from the same directory as the compiler.
 - **Activation command or post-activation verification failed.** Check the printed `vcvars64.bat` path and the preceding vendor output. Retry from a clean CMD session after correcting the reported issue. The failed attempt may have changed the current environment.
 
 ## Effects on the calling shell
 
 `vcvars64.bat` applies the MSVC and Windows SDK settings in the calling shell. The wrapper sets `VSCMD_SKIP_SENDTELEMETRY=1` before invoking it and leaves that value in the caller. On exit it clears `INFO`, `OKOK`, `WARN`, `ERROR`, `EXIT_STATUS`, and its other scratch variables, including any preexisting values under those names.
-
-[conda_far.bat](conda_far.bat) calls the script during environment setup when it is present. It stops on activation failure and sets `DISTUTILS_USE_SDK=1` after successful activation.
