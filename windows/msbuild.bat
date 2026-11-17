@@ -40,8 +40,17 @@ set "_VCVARS64="
 :: --- 1. Check if already activated (x64 + cl.exe + link.exe) ---
 
 echo %INFO% MSBuild: Checking if 64-bit environment is already activated...
+if not defined VSINSTALLDIR (
+    echo %INFO% MSBuild: VSINSTALLDIR is not defined. Proceeding with search...
+    goto :MSBUILD_SEARCH
+)
+
 call :VERIFY_X64_ACTIVE
-if errorlevel 1 goto :MSBUILD_SEARCH
+if not "%ERRORLEVEL%"=="0" (
+    echo %WARN% MSBuild: Existing VSINSTALLDIR environment is not an active x64 build shell. Proceeding with search...
+    goto :MSBUILD_SEARCH
+)
+
 echo %INFO% MSBuild: VSINSTALLDIR points to "%VSINSTALLDIR:"=%".
 echo %OKOK% MSBuild: 64-bit environment already active. Skipping activation.
 set "EXIT_STATUS=0"
@@ -80,7 +89,7 @@ if defined _VCVARS64 goto :MSBUILD_ACTIVATION
 :: --- 4. Check PATH for vcvarsall.bat or BuildTools ---
 
 echo %INFO% MSBuild: Checking if vcvarsall.bat is on the PATH.
-for /f "usebackq tokens=* delims=" %%A in (`where.exe $PATH:vcvarsall.bat 2^>nul`) do if not defined _VCVARS64 call :TRY_FILE "%%~fA"
+for /f "usebackq tokens=* delims=" %%A in (`where.exe vcvarsall.bat 2^>nul`) do if not defined _VCVARS64 call :TRY_FILE "%%~fA"
 if defined _VCVARS64 echo %INFO% MSBuild: Found vcvars64.bat via PATH: "%_VCVARS64%". Attempting activation...
 if defined _VCVARS64 goto :MSBUILD_ACTIVATION
 
@@ -140,7 +149,7 @@ echo %WARN% MSBuild: Activating MS Build Tools.
 echo %INFO% MSBuild: Calling "%_VCVARS64%"
 echo:
 call "%_VCVARS64%"
-if errorlevel 1 (
+if not "%ERRORLEVEL%"=="0" (
     echo:
     echo %ERROR% MSBuild: vcvars64.bat returned an error.
     set "EXIT_STATUS=1"
@@ -149,9 +158,9 @@ if errorlevel 1 (
 echo:
 
 call :VERIFY_X64_ACTIVE
-if errorlevel 1 (
+if not "%ERRORLEVEL%"=="0" (
     set "EXIT_STATUS=1"
-    echo %ERROR% MSBuild: MS Build Tools activation failed verification: x64 cl.exe/link.exe not active.
+    echo %ERROR% MSBuild: MS Build Tools activation failed verification.
     echo %ERROR% MSBuild: Used script "%_VCVARS64%".
     goto :MSBUILD_ACTIVATED
 )
@@ -170,29 +179,33 @@ set "_MSVS="
 set "_VCVARS64="
 set "_PATH="
 set "_VSWHERE="
-set "_TMP_VAL="
-set "_TMP_VSDIR="
 set "EXIT_STATUS=" & exit /b %EXIT_STATUS%
 
 
 :: ============================================================================ SUBROUTINES BEGIN
 :CHECK_VCVARS
-set "_TMP_VAL=%VCVARS:"=%"
-call :TRY_FILE "%_TMP_VAL%"
-set "_TMP_VAL="
-if defined _VCVARS64 echo %INFO% MSBuild: VCVARS points to "%VCVARS:"=%". Attempting activation...
+call :TRY_FILE "%VCVARS:"=%"
+if not "%ERRORLEVEL%"=="0" (
+    echo %WARN% MSBuild: VCVARS points to "%VCVARS:"=%", but vcvars64.bat was not found there.
+    exit /b 1
+)
+echo %INFO% MSBuild: VCVARS points to "%VCVARS:"=%". Attempting activation...
 exit /b 0
 
 :CHECK_BUILDTOOLS
-set "_TMP_VAL=%BUILDTOOLS:"=%"
-call :TRY_ROOT "%_TMP_VAL%"
-set "_TMP_VAL="
+call :TRY_ROOT "%BUILDTOOLS:"=%"
+if not "%ERRORLEVEL%"=="0" (
+    echo %WARN% MSBuild: BUILDTOOLS points to "%BUILDTOOLS:"=%", but vcvarsall.bat/vcvars64.bat were not found there.
+    exit /b 1
+)
 exit /b 0
 
 :CHECK_MSBUILDTOOLS
-set "_TMP_VAL=%MSBUILDTOOLS:"=%"
-call :TRY_ROOT "%_TMP_VAL%"
-set "_TMP_VAL="
+call :TRY_ROOT "%MSBUILDTOOLS:"=%"
+if not "%ERRORLEVEL%"=="0" (
+    echo %WARN% MSBuild: MSBUILDTOOLS points to "%MSBUILDTOOLS:"=%", but vcvarsall.bat/vcvars64.bat were not found there.
+    exit /b 1
+)
 exit /b 0
 
 :TRY_FILE
@@ -217,17 +230,43 @@ if defined _VCVARS64 exit /b 0
 exit /b 1
 
 :VERIFY_X64_ACTIVE
-if not defined VSINSTALLDIR exit /b 1
-set "_TMP_VSDIR=%VSINSTALLDIR:"=%"
-if not defined _TMP_VSDIR exit /b 1
-if not exist "%_TMP_VSDIR%\VC\Auxiliary\Build\vcvarsall.bat" set "_TMP_VSDIR=" & exit /b 1
-if not exist "%_TMP_VSDIR%\VC\Auxiliary\Build\vcvars64.bat" set "_TMP_VSDIR=" & exit /b 1
-set "_TMP_VSDIR="
-if /i not "%VSCMD_ARG_TGT_ARCH%"=="x64" exit /b 1
-where.exe /q $PATH:cl.exe
-if errorlevel 1 exit /b 1
-where.exe /q $PATH:link.exe
-if errorlevel 1 exit /b 1
+if not defined VSINSTALLDIR (
+    echo %ERROR% MSBuild: VSINSTALLDIR is not defined.
+    exit /b 1
+)
+call :VERIFY_VSDIR "%VSINSTALLDIR:"=%"
+if not "%ERRORLEVEL%"=="0" (
+    exit /b 1
+)
+if /i not "%VSCMD_ARG_TGT_ARCH%"=="x64" (
+    echo %ERROR% MSBuild: VSCMD_ARG_TGT_ARCH is "%VSCMD_ARG_TGT_ARCH%" ^(expected "x64"^).
+    exit /b 1
+)
+where.exe /q cl.exe
+if not "%ERRORLEVEL%"=="0" (
+    echo %ERROR% MSBuild: Compiler cl.exe not found on PATH.
+    exit /b 1
+)
+where.exe /q link.exe
+if not "%ERRORLEVEL%"=="0" (
+    echo %ERROR% MSBuild: Linker link.exe not found on PATH.
+    exit /b 1
+)
+exit /b 0
+
+:VERIFY_VSDIR
+if "%~1"=="" (
+    echo %ERROR% MSBuild: VSINSTALLDIR is empty.
+    exit /b 1
+)
+if not exist "%~1\VC\Auxiliary\Build\vcvarsall.bat" (
+    echo %ERROR% MSBuild: vcvarsall.bat not found under "%~1".
+    exit /b 1
+)
+if not exist "%~1\VC\Auxiliary\Build\vcvars64.bat" (
+    echo %ERROR% MSBuild: vcvars64.bat not found under "%~1".
+    exit /b 1
+)
 exit /b 0
 :: ============================================================================ SUBROUTINES END
 
