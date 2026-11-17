@@ -204,7 +204,7 @@ if not "%EXIT_STATUS%"=="0" (
 
 set "EXIT_STATUS=0"
 echo %OKOK% MSBuild: MS Build Tools activation succeeded.
-echo %OKOK% MSBuild: VSINSTALLDIR points to "%VSINSTALLDIR:"=%".
+echo %OKOK% MSBuild: VSINSTALLDIR points to "%VSINSTALLDIR%".
 
 :MSBUILD_ACTIVATED
 
