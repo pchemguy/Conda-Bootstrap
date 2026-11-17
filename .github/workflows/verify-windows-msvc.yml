@@ -1,0 +1,51 @@
+name: Verify MSVC activation
+on:
+  push:
+    branches:
+      - verify/windows-msvc
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: windows-2022
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [OFF, 'ON']
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - uses: actions/checkout@v4
+      - name: Activate and build with MSVC
+        env:
+          NOCOLOR: '1'
+        run: |
+          @echo off
+          setlocal EnableExtensions EnableDelayedExpansion
+          if /i "${{ matrix.mode }}"=="OFF" setlocal DisableDelayedExpansion
+          set "INFO=caller marker"
+          call windows\msbuild.bat
+          if errorlevel 1 exit /b 1
+          if not "%INFO%"=="caller marker" exit /b 2
+          if /i not "%VSCMD_ARG_TGT_ARCH%"=="x64" exit /b 3
+          where cl.exe || exit /b 4
+          where link.exe || exit /b 5
+          >smoke.c echo int main^(void^) { return 0; }
+          cl /nologo /Fesmoke.exe smoke.c || exit /b 6
+          smoke.exe || exit /b 7
+          call windows\msbuild.bat
+          if errorlevel 1 exit /b 8
+          exit /b 0
+      - name: Activate from explicit script path
+        env:
+          NOCOLOR: '1'
+        run: |
+          @echo off
+          for /f "usebackq delims=" %%I in (`call "%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "VCVARS=%%I\VC\Auxiliary\Build\vcvarsall.bat"
+          if not defined VCVARS exit /b 10
+          call windows\msbuild.bat
+          if errorlevel 1 exit /b 11
+          if not defined VCToolsInstallDir exit /b 12
+          exit /b 0
