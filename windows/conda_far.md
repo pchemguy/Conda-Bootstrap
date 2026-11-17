@@ -1,6 +1,6 @@
 # Windows development environment activation
 
-[conda_far.bat](conda_far.bat) prepares an existing Windows Python or Conda installation for development. It configures tool caches, loads MSVC when `msbuild.bat` is available, activates Python, and runs any local configuration scripts. It can launch an interactive session, prepare the caller's shell, or run a single command.
+[conda_far.bat](conda_far.bat) prepares an existing Windows Python or Conda installation for development. It configures tool caches, loads MSVC when `msbuild.bat` is available, activates Python, and runs any local configuration scripts. It can initialize caches before bootstrap, launch an interactive session, prepare the caller's shell, or run a single command.
 
 Activation changes the filesystem as well as the shell environment. See [Cache configuration](#cache-configuration) and [MSVC and the linker](#msvc-and-the-linker) for the paths it can replace.
 
@@ -8,12 +8,22 @@ Activation changes the filesystem as well as the shell environment. See [Cache c
 
 - Use Windows CMD with command extensions enabled. Any argument, including `/nocolor`, requires delayed expansion in the caller. Start a CMD session with `cmd.exe /E:ON /V:ON`, or use `setlocal EnableExtensions EnableDelayedExpansion` in a calling batch file.
 - Start from a clean shell. The script rejects a defined `CONDA_PREFIX` and any `python.exe` or `conda.bat` that `where.exe` finds in the working directory or on `PATH`.
-- The installation must contain `python.exe`, `condabin\conda.bat`, and `condabin\mamba.bat`. By default it uses the `Anaconda` directory beside the script.
+- Activation modes require an installation containing `python.exe`, `condabin\conda.bat`, and `condabin\mamba.bat`. The default installation is `Anaconda` beside the script. `/cache` can run before the installation exists.
 - The script needs write access to the selected cache root and permission to create directory junctions under `%LOCALAPPDATA%`.
 
 ## Workflows
 
 The examples use CMD from the repository root.
+
+### Initialize caches before installing Python
+
+In a clean CMD session with delayed expansion enabled, run:
+
+```bat
+call windows\conda_far.bat /cache
+```
+
+A successful call returns `0` and leaves the selected cache root in `_CACHE` for the caller. This mode still checks for an existing Conda prefix or visible Python or Conda commands, then creates cache directories and replaces the profile cache junctions. It returns before validating the installation or running the linker rename, MSVC setup, Conda activation, configuration scripts, or a command or child shell. Any `CONDA_BAT` and `MAMBA_BAT` paths exposed by this mode are provisional.
 
 ### Open an interactive development session
 
@@ -39,7 +49,10 @@ Run subsequent build commands in that same shell. When the caller uses `setlocal
 
 ### Prepare an installation during bootstrap
 
-[Anaconda.bat](Anaconda.bat) sets `_CONDA_PREFIX` to the installation it just created and calls `conda_far.bat /preactivate`. This mode performs the same setup as `/batch` and returns to the bootstrap script without starting a child shell. `CONDA_BAT` and `MAMBA_BAT` remain available for the subsequent environment import and export.
+[Anaconda.bat](Anaconda.bat) calls `conda_far.bat` at two points in the bootstrap workflow.
+
+1. `/cache` prepares the cache root before the Micromamba and uv downloads. The bootstrap script uses the returned `_CACHE` for these downloads.
+2. After creating the installation, the bootstrap script sets `_CONDA_PREFIX` to the new prefix and calls `/preactivate`. This performs the same activation as `/batch`, returns to the bootstrap script, and retains `_CACHE`, `CONDA_BAT`, and `MAMBA_BAT` for later steps.
 
 ### Run one command and return
 
@@ -68,24 +81,24 @@ The cache override must already exist to be selected. See the cache selection or
 | Input | Effect |
 | --- | --- |
 | `_CONDA_PREFIX` | Selects the installation containing `python.exe` and the two activation wrappers. The default is `Anaconda` beside the script. |
-| `_CACHE` | Uses an existing path as the cache root. Cleanup clears this variable. |
+| `_CACHE` | Uses an existing path as the cache root. Standalone `/cache` and `/preactivate` retain the resolved root for the caller. Ordinary `/batch` cleanup clears it. |
 | `CONDA_PKGS_DIRS` | Uses a caller-supplied package cache path or defaults to `<cache root>\Python\pkgs`. The directory creation step treats a supplied value as one path. |
 | `/nocolor`, `NOCOLOR`, `NO_COLOR` | Select plain text diagnostics. The option and `NO_COLOR` set `NOCOLOR=1`. |
 | `JAVA_HOME` | Retains an existing value. Otherwise, the script sets it if it finds the bundled JVM under `Library\lib\jvm` or `Library\jre`. |
 | `config_*.bat` | Calls each matching batch file beside `conda_far.bat` after activation and before the selected workflow continues. A nonzero result stops setup. |
 
-Option names are case-insensitive. The parser accepts `/`, `-`, or `--` prefixes and warns before skipping unrecognized tokens. Without a recognized mode option, it follows the interactive workflow.
+Option names are case-insensitive. The parser accepts `/`, `-`, or `--` prefixes and warns before skipping unrecognized tokens. Without a recognized mode option, it follows the interactive workflow. After parsing, `/cache` takes precedence over other mode options and returns after cache setup. In the activation flow, `/cli` runs before the return checks for `/batch` and `/preactivate`.
 
 ## Setup order and results
 
 1. Parse options, select the prefix, and check delayed expansion.
-2. Check for an active or visible Python or Conda environment and verify the three required installation files.
-3. Configure cache directories and junctions, then handle the linker collision described below.
+2. Check for an active or visible Python or Conda environment. For activation modes, verify the three required installation files.
+3. Configure cache directories and junctions. `/cache` returns at this point. Activation modes continue with the linker handling described below.
 4. Call the sibling `msbuild.bat` when present. A missing file produces a warning and skips MSVC setup. A nonzero result aborts activation. Success sets `DISTUTILS_USE_SDK=1` for builds that reuse the configured toolchain.
 5. Call the selected `condabin\conda.bat` with `activate`. Use `PYTHON_HOME` as a fallback if the wrapper leaves `CONDA_PREFIX` unset. Check for `python.exe` under the resulting prefix and obtain `PYTHON_VERSION` from `python.exe --version`.
 6. Check for the bundled JVM, run local configuration scripts, and continue in the selected mode.
 
-Successful `/batch` and `/preactivate` leave the activated environment and wrapper paths available to the caller. Cleanup clears temporary values such as `_CACHE`, parsed arguments, and the diagnostic prefix variables `INFO`, `OKOK`, `WARN`, and `ERROR`. At entry, the script clears any ordinary environment variable named `ERRORLEVEL` so CMD's status expansion can be used.
+Successful `/batch` and `/preactivate` leave the activated environment and wrapper paths available to the caller. `/cache` and `/preactivate` also return the cache root as `_CACHE`. Cleanup clears parsed arguments and the diagnostic prefix variables `INFO`, `OKOK`, `WARN`, and `ERROR`. At entry, the script clears any ordinary environment variable named `ERRORLEVEL` so CMD's status expansion can be used.
 
 ## Filesystem changes
 
@@ -112,7 +125,7 @@ The script checks whether it can create and remove a probe directory named `$$$_
 | `ELECTRON_BUILDER_CACHE` | `<cache root>\electron-builder` |
 | `PLAYWRIGHT_BROWSERS_PATH` | `<cache root>\playwright` |
 
-The script creates junctions at `%LOCALAPPDATA%\pip\cache` and `%LOCALAPPDATA%\uv\cache` pointing to the selected pip and uv caches. It removes an existing entry at either cache path with `rmdir /S /Q` before creating the junction. An ordinary cache directory and its contents are deleted without migration.
+Both `/cache` and full activation configure the same cache paths. They create junctions at `%LOCALAPPDATA%\pip\cache` and `%LOCALAPPDATA%\uv\cache` pointing to the selected pip and uv caches. Before creating each junction, the script removes an existing entry at that cache path with `rmdir /S /Q`. An ordinary cache directory and its contents are deleted without migration.
 
 ### MSVC and the linker
 
@@ -122,7 +135,7 @@ If the selected prefix contains `Library\usr\bin\link.exe`, the script renames i
 
 | Outcome | Exit status |
 | --- | --- |
-| Successful `/batch` or `/preactivate` | `0` |
+| Successful `/cache`, `/batch`, or `/preactivate` | `0` |
 | `/cli`, FAR, or interactive CMD completes | The command or child shell's status |
 | Setup fails | A nonzero status, either `1` or the status of the failing step |
 
