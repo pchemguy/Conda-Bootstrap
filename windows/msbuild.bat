@@ -1,26 +1,11 @@
 @echo off
 
 :: ============================================================================
-::  Purpose:
-::    Detects and activates 64-bit Microsoft Build Tools (MSVC) environment.
-::    This script is idempotent and can be safely re-run.
-::
-::  Behavior:
-::    - If 64-bit MS Build Tools are already active (VSINSTALLDIR, x64 arch,
-::      and cl.exe/link.exe verified on PATH), exits successfully.
-::    - Otherwise, checks explicit env vars, custom paths, PATH, vswhere, and
-::      standard installation directories for a valid vcvars64.bat.
-::    - Activates 64-bit environment via vcvars64.bat when found.
-::    - Explicitly verifies that link.exe executes the Microsoft Incremental
-::      Linker and fails if shadowed by MSYS/Git/GNU link.exe.
-::
-::  Preconditions:
-::    - NOCOLOR: If set, gracefully falls back to no color.
-::    - Does NOT require DelayedExpansion in the caller's environment.
-::
-::  Exit codes:
-::    0 = success
-::    1 = activation failed, not found, or link.exe collision detected
+:: Activate the MSVC build environment for an x64 target in the current CMD.
+:: Reuse a verified environment or find and call vcvars64.bat.
+:: Set NOCOLOR for plain output. Caller delayed expansion is optional.
+:: Returns 0 for a verified environment or 1 on failure.
+:: See msbuild.md for configuration, discovery, and troubleshooting.
 :: ============================================================================
 
 call :COLOR_SCHEME
