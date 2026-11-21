@@ -3,14 +3,6 @@ channels:
   - conda-forge
   - nodefaults
 dependencies:
-  - nodejs
-  - aiosqlite
-  - psutil
-  - jsonschema
-  - python-fastjsonschema
-  - pyyaml
-  - icu
-  - numpy
   - coverage
   - pyinstrument
   - pyperf
@@ -19,5 +11,4 @@ dependencies:
   - pytest-cov
   - pytest-asyncio
   - pytest-timeout
-  - pandas
-  - polars
+  - pyyaml

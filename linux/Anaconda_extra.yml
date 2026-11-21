@@ -1,0 +1,14 @@
+name: conda_bootstrap
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - nodejs
+  - aiosqlite
+  - psutil
+  - jsonschema
+  - python-fastjsonschema
+  - icu
+  - numpy
+  - pandas
+  - polars
