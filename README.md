@@ -23,12 +23,13 @@ Use `Anaconda.txt` for packages or builds you want from PyPI, an alternate index
 <details>
 <summary>Requirements examples for an alternate index and a direct wheel</summary><br>
 
-To add the PyTorch CUDA index for `torch`, put these lines in `Anaconda.txt`.<br><br>
+To add the PyTorch CUDA index for `torch`, put these lines in `Anaconda.txt`.<br>
 
 <code>
 --extra-index-url https://download.pytorch.org/whl/cu129<br>
-torch<br><br>
+torch
 </code>
+<br>
 
 To install spaCy’s small English pipeline, `en_core_web_sm`, put its release wheel URL on a line in `Anaconda.txt`.<br><br>
 
