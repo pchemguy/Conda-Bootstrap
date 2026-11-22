@@ -1,91 +1,90 @@
 # Conda Bootstrap
 
-Conda Bootstrap uses Micromamba to create a project-local Python environment on Windows (CMD) or Linux (Bash), without a preinstalled Python or Conda. Both harnesses install Python, Conda, Mamba, Micromamba, and uv in a directory named after the bootstrap script. This directory is the environment’s *prefix*. Edit the adjacent manifests to choose packages, then activate the prefix in the shell where you work.
+Conda Bootstrap creates a project-local Python environment on Windows or Linux using Micromamba. Copy the files for your platform into the directory that will host the environment, choose the packages in the supplied manifests, and run the bootstrap once. The default manifests install Python, Conda, Mamba, Micromamba, and uv under `Anaconda/`, beside the bootstrap script. On subsequent visits, use the activation script to work in that environment. No existing Python or Conda installation is required.
 
 ## Windows harness
 
-On Windows, three batch files handle different parts of the workflow. [Anaconda.bat](windows/Anaconda.bat) builds the environment. [conda_far.bat](windows/conda_far.bat) activates it for an interactive session, a batch build, or a single command. [msbuild.bat](windows/msbuild.bat) prepares the x64 Visual C++ toolchain used by native builds.
+### Set up a project
 
-### Build and open the environment
+1. Copy the **contents** of [windows/](windows/) into the local directory that will hold the harness and its environment. For example, copying them into `D:\Dev\MyProject` puts `Anaconda.bat` and `conda_far.bat` directly in that directory. The resulting interpreter will be `D:\Dev\MyProject\Anaconda\python.exe`.
+2. Edit the dependency files beside `Anaconda.bat`. Use the files as supplied for the default package set.
 
-Start a **clean Command Prompt** in the repository root on x64 Windows. The harness requires `curl.exe` and `tar.exe` on `PATH`. With the shipped `msbuild.bat`, install the Visual Studio C++ Build Tools before bootstrapping. Leave `CONDA_PREFIX` unset and check that `where.exe python.exe` and `where.exe conda.bat` find nothing in the current directory or on `PATH`. A Windows app execution alias for Python counts as a match.
+   | File | What belongs here |
+   | --- | --- |
+   | [Anaconda_bootstrap.yml](windows/Anaconda_bootstrap.yml) | The base environment. The supplied manifest includes Python, the package managers, Git, Hatch, Ruff, and mypy. |
+   | [Anaconda.yml](windows/Anaconda.yml) | Project dependencies installed through Conda. The supplied manifest includes Node.js, pytest, NumPy, pandas, and Polars. |
+   | [Anaconda.txt](windows/Anaconda.txt) | Python requirements installed with uv after the Conda packages. The supplied file adds `flowmark`. |
 
-**Before the first run**, check the existing cache directories. The harness replaces `%LOCALAPPDATA%\pip\cache` and `%LOCALAPPDATA%\uv\cache` with junctions to its selected cache. It deletes the contents of ordinary directories at those paths. The Conda bootstrap also removes `%APPDATA%\mamba` recursively if it exists, pausing first unless `/q` is set. To choose the cache root, set `_CACHE` to an existing writable directory before running the scripts.
+3. On x64 Windows, open a Command Prompt without an active Python or Conda environment and run the copied bootstrap. It uses `curl.exe` and `tar.exe`.
 
-Run the bootstrap, then open the environment if it succeeds.
+   ```bat
+   cd /d D:\Dev\MyProject
+   Anaconda.bat
+   ```
+
+### Use the installed environment
+
+From the local harness directory, run `conda_far.bat` whenever you want to work in the environment.
 
 ```bat
-call windows\Anaconda.bat && call windows\conda_far.bat
+cd /d D:\Dev\MyProject
+conda_far.bat
 ```
 
-The bootstrap creates `windows\Anaconda` and returns to the original prompt. The second command opens FAR Manager when available, or an interactive CMD session otherwise. Inside that session, `echo %CONDA_PREFIX%` shows the active prefix and `where.exe python.exe` should list its interpreter first.
+The launcher activates `Anaconda\`, applies any sibling `config_*.bat` files, and opens FAR Manager if available or an interactive CMD session otherwise. Python and the installed tools are available there.
 
-### Choose the dependencies
+For an automated build, use `/batch` to activate the calling batch file and continue with your own commands. This example assumes your batch file is beside `conda_far.bat`.
 
-Keep the manifests beside `Anaconda.bat`. The script calls `conda_far.bat /cache` before downloading or reusing Micromamba and uv. It builds the prefix from the bootstrap YAML, calls `conda_far.bat /preactivate`, and checks the new interpreter before installing project packages.
+```bat
+@echo off
+setlocal EnableExtensions EnableDelayedExpansion
+call "%~dp0conda_far.bat" /batch
+if errorlevel 1 exit /b %errorlevel%
+python --version
+```
 
-| Input, in processing order | Purpose |
-| --- | --- |
-| [Anaconda_bootstrap.yml](windows/Anaconda_bootstrap.yml) | Defines the base environment on conda-forge. The shipped file includes the package managers, Python, Git, Hatch, Ruff, and mypy. |
-| [Anaconda.yml](windows/Anaconda.yml) | Adds project packages through Mamba. The shipped selection includes Node.js, NumPy, pandas, Polars, and pytest. |
-| `*.req.txt` | Installs each matching requirements file with the activated `pip.exe`. |
-| `requirements.txt`, then [Anaconda.txt](windows/Anaconda.txt) | Installs each file that exists with `uv pip install --system` in the activated environment. The shipped `Anaconda.txt` adds `flowmark`. |
+To run just one command, use `conda_far.bat /cli "python --version"` from a CMD session started with `cmd.exe /E:ON /V:ON`. The launcher returns the command’s exit status. See the [activation guide](windows/conda_far.md) for the other modes and configuration hooks.
 
-A full Conda build writes `Anaconda_generated.yml` (Conda environment export without build strings) and `Anaconda.pip.txt` (the `uv pip list` package inventory) beside the script.
+### How the Windows bootstrap works
 
-**Choose full or base-only on the first run.** `/init` stops after activating and checking the base. Once `windows\Anaconda\python.exe` exists, any later bootstrap invocation returns success immediately. This also applies after an interrupted build. To rebuild from the manifests, move the existing prefix aside first. `/q` reduces package-manager output and skips the Mamba-directory pause. `/nocolor` selects plain status labels.
+[Anaconda.bat](windows/Anaconda.bat) calls `conda_far.bat /cache` to select a shared cache, downloads or reuses Micromamba and uv, and creates `Anaconda\` from the bootstrap YAML. It then calls `conda_far.bat /preactivate` to activate the new environment for the rest of the installation. After verifying Python, it applies `Anaconda.yml` with Mamba. It then processes any `*.req.txt` files with pip, followed by `requirements.txt` and `Anaconda.txt` with uv when present. A full run writes `Anaconda_generated.yml` and `Anaconda.pip.txt` beside the batch file and returns to the original prompt.
 
-For a new Conda prefix, the script requires the bootstrap YAML plus either the main YAML or a sibling `pyproject.toml`. When the bootstrap YAML is absent and `pyproject.toml` exists, the script attempts a standalone NuGet CPython installation. Its version parser cannot read the documented `requires-python = ">=3.10"` example, and its generated activation wrappers cannot apply a Conda YAML. The [Windows bootstrap guide](windows/Anaconda.md) describes this fallback and the recovery paths.
+**Effects on existing caches.** Cache setup replaces `%LOCALAPPDATA%\pip\cache` and `%LOCALAPPDATA%\uv\cache` with junctions to the shared cache. It deletes the contents of ordinary directories at those paths. Set `_CACHE` to an existing writable directory to choose the cache location. On the Conda installation path, the bootstrap also pauses before recursively removing an existing `%APPDATA%\mamba`. The `/q` switch skips that pause and reduces package-manager output.
 
-### Activate for development or automation
+**Visual C++ tools.** During activation, `conda_far.bat` calls the sibling [msbuild.bat](windows/msbuild.bat) if present. It detects an already configured x64 MSVC shell or searches for an installed Visual Studio or Microsoft Build Tools C++ toolchain and activates it through `vcvars64.bat`. If it cannot find the tools, activation stops and the helper points you to installation instructions. You install the Build Tools yourself. If the helper is absent, activation skips the MSVC step. See the [toolchain detection guide](windows/msbuild.md) for search paths and diagnostics.
 
-For an existing installation, start each workflow from a clean CMD session. When passing an option to `conda_far.bat`, enable delayed expansion in the caller with `cmd.exe /E:ON /V:ON` or `setlocal EnableExtensions EnableDelayedExpansion` in a batch file.
-
-| Goal | Command from the repository root |
-| --- | --- |
-| Open an interactive development session | `call windows\conda_far.bat` |
-| Activate the calling batch file and continue its build | `call windows\conda_far.bat /batch` |
-| Activate, run one command, and return its exit status | `call windows\conda_far.bat /cli "python.exe --version"` |
-
-During activation, `msbuild.bat` reuses a verified x64 build shell or locates and calls `vcvars64.bat`. It checks that `cl.exe` and the Microsoft `link.exe` resolve from the same directory. The activation wrapper handles a conflicting MSYS `Library\usr\bin\link.exe` by renaming it to `link_.exe`, replacing any previous backup. After MSVC setup, it sets `DISTUTILS_USE_SDK=1` so setuptools can reuse the toolchain. It then activates the Conda prefix, checks for a bundled JVM if `JAVA_HOME` is unset, and calls sibling `config_*.bat` scripts for project-specific settings.
-
-For cache selection, custom prefixes, and activation hooks, see the [activation guide](windows/conda_far.md). For compiler discovery and linker diagnostics, see the [MSVC guide](windows/msbuild.md).
+**Base-only installs and reruns.** `Anaconda.bat /init` stops after creating, activating, and checking the base. Once `Anaconda\python.exe` exists, the bootstrap returns success immediately, even if an earlier run stopped before installing all project packages. Choose a full run initially if you want the project manifests applied. To rebuild, move the old prefix aside and run `Anaconda.bat` again. The [Windows bootstrap guide](windows/Anaconda.md) also documents the alternate NuGet CPython path and its `pyproject.toml` parsing limits.
 
 ## Linux harness
 
-[Anaconda.sh](linux/Anaconda.sh) installs a complete Conda base in `linux/Anaconda/` and generates `linux/Anaconda_activate.sh` beside it. Linux builds use the system C toolchain and normal package-manager caches. Use Bash on glibc-based x86-64 or AArch64 Linux with `curl`, `flock`, and standard GNU utilities. Choose a writable installation path without whitespace because installed command-line tools can embed the absolute interpreter path.
+### Set up a project
 
-### Build, activate, and verify
+Copy the **contents** of [linux/](linux/) into the local directory that will hold the harness and environment. Use a writable path without whitespace on glibc-based x86-64 or AArch64 Linux. The bootstrap uses Bash, `curl`, `flock`, and standard GNU utilities. Native builds use the configured system compiler.
 
-Run these commands from the repository root. The bootstrap runs in its own process. Source the generated launcher in each shell that needs the environment.
+Edit the manifests beside [Anaconda.sh](linux/Anaconda.sh) before running it.
+
+| File | How the harness uses it |
+| --- | --- |
+| [Anaconda_bootstrap.yml](linux/Anaconda_bootstrap.yml) | Defines the base. A temporary Micromamba executable installs it into `Anaconda/` on the first run. |
+| [Anaconda.yml](linux/Anaconda.yml) | Adds Conda project packages on a full run. The supplied file includes pytest, coverage, profiling tools, and PyYAML. |
+| [Anaconda.txt](linux/Anaconda.txt) | Adds pip requirements through uv using the prefix’s Python. |
+| [Anaconda_extra.yml](linux/Anaconda_extra.yml) | Provides optional packages such as Node.js, NumPy, pandas, and Polars. Apply this manifest separately when needed. |
+
+From the directory containing the copied files, run the bootstrap and source the launcher it generates.
 
 ```bash
-./linux/Anaconda.sh &&
-    source ./linux/Anaconda_activate.sh &&
+bash ./Anaconda.sh &&
+    source ./Anaconda_activate.sh &&
     python -c 'import sys; print(sys.prefix)'
 ```
 
-The printed path should end in `linux/Anaconda`. Use `conda deactivate` to leave the environment. For a single command in automation, the prefix's Conda can also run a program directly from a fresh shell.
+The printed path is the local `Anaconda/` directory. A full run writes `Anaconda_generated.yml` and `Anaconda.pip.txt` beside the script.
 
-```bash
-./linux/Anaconda/bin/conda run --prefix "$PWD/linux/Anaconda" python --version
-```
+### Activate, update, or extend the environment
 
-### Configure and update the environment
+- **Start a new session.** Run `source ./Anaconda_activate.sh` from the harness directory in each Bash shell that needs the environment. Use `conda deactivate` when finished. Sourcing the launcher also runs Conda package hooks, including the `JAVA_HOME` setup when a conda-forge OpenJDK is installed.
+- **Run a single command.** From the same directory, use `./Anaconda/bin/conda run --prefix "$PWD/Anaconda" python --version`.
+- **Build in stages.** Run `bash ./Anaconda.sh --init` to create the base and launcher. A later `bash ./Anaconda.sh` reuses the base and applies the project manifests. Run it again after changing `Anaconda.yml` or `Anaconda.txt`.
+- **Install the extras.** With the environment active, run `micromamba env update --yes --no-rc --prefix "$CONDA_PREFIX" --file ./Anaconda_extra.yml` from the harness directory.
 
-| Input | How the harness uses it |
-| --- | --- |
-| [Anaconda_bootstrap.yml](linux/Anaconda_bootstrap.yml) | Required. On the first run, a temporary Micromamba executable installs the base at the script-named prefix. |
-| [Anaconda.yml](linux/Anaconda.yml) | A full run applies this optional Conda manifest with the prefix's Micromamba. The shipped selection includes pytest, coverage, profiling tools, and PyYAML. |
-| [Anaconda.txt](linux/Anaconda.txt) | After activation, the prefix's uv installs these optional pip requirements against the same Python interpreter. |
-| [Anaconda_extra.yml](linux/Anaconda_extra.yml) | Separate manifest for additional packages, including Node.js, NumPy, pandas, and Polars. Apply it explicitly when those tools are needed. |
-
-Use `./linux/Anaconda.sh --init` for the base and its launcher. A subsequent full run **reuses the base**, applies the project manifests, and writes `linux/Anaconda_generated.yml` and `linux/Anaconda.pip.txt`. Rerun after editing `Anaconda.yml` or `Anaconda.txt`. Removing an entry from a manifest leaves the installed package in place.
-
-To install the extra packages in an activated environment, run this from the repository root.
-
-```bash
-micromamba env update --yes --no-rc --prefix "$CONDA_PREFIX" --file ./linux/Anaconda_extra.yml
-```
-
-The launcher activates the prefix through Conda, so package-provided activation hooks run in the current shell. For example, adding `openjdk` to `Anaconda.yml` lets the package's hook set `JAVA_HOME` on activation. Local settings can use paired scripts under `etc/conda/activate.d/` and `etc/conda/deactivate.d/` in the prefix. See the [Linux bootstrap guide](linux/Anaconda.md) for customization and the [agent setup recipe](linux/AGENTS.md) for a compact workflow.
+See the [Linux bootstrap guide](linux/Anaconda.md) for activation settings and the [agent setup recipe](linux/AGENTS.md) for a compact workflow.
