@@ -23,7 +23,7 @@ Use `Anaconda.txt` for packages or builds you want from PyPI, an alternate index
 <details>
 <summary>Requirements examples for an alternate index and a direct wheel</summary><br>
 
-To add the PyTorch CUDA index for `torch`, put these lines in `Anaconda.txt`.<br>
+To add the PyTorch CUDA index for `torch`, put these lines in `Anaconda.txt`.
 
 <code>
 --extra-index-url https://download.pytorch.org/whl/cu129<br>
