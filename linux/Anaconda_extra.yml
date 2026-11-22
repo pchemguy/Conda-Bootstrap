@@ -4,6 +4,7 @@ channels:
   - nodefaults
 dependencies:
   - nodejs
+  - pyyaml
   - aiosqlite
   - psutil
   - jsonschema

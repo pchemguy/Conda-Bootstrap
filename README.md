@@ -5,7 +5,9 @@ url: https://chatgpt.com/c/6afc32cd-eb8c-83e9-a6ee-3c2cbe3b1a4d
 
 # Conda Bootstrap
 
-Conda Bootstrap creates a project-local Python environment on Windows or Linux using Micromamba. Copy the files for your platform into the directory that will host the environment, choose the packages in the supplied manifests, and run the bootstrap once. The default manifests install Python, Conda, Mamba, Micromamba, and uv under `Anaconda/`, beside the bootstrap script. On subsequent visits, use the activation script to work in that environment. No existing Python or Conda installation is required.
+Conda Bootstrap creates a project-local Python environment on Windows or Linux using Micromamba. Copy the files for your platform into the directory that will host the environment, choose the packages in the supplied manifests, and run the bootstrap `Anaconda.bat` once. The default manifests install Python, Conda, Mamba, Micromamba, and uv under `Anaconda/`, beside the bootstrap script. On subsequent visits, use the activation script to work in that environment. No existing Python or Conda installation is required.
+
+The project is focused on creating Conda environments primarily from the `conda-forge`. Other channels may be added by editing the list in the manifest files or relying on local configuration. When required packages are not readily available from Conda (e.g., poorly supported or not available at all), PyPi is used as fallback source. The bootstrap script installs Conda packages first, then PyPi packages using `uv`.
 
 ## Windows harness
 
@@ -14,18 +16,18 @@ Conda Bootstrap creates a project-local Python environment on Windows or Linux u
 1. Copy the **contents** of [windows/](windows/) into the local directory that will hold the harness and its environment. For example, copying them into `D:\Dev\MyProject` puts `Anaconda.bat` and `conda_far.bat` directly in that directory. The resulting interpreter will be `D:\Dev\MyProject\Anaconda\python.exe`.
 2. Edit the dependency files beside `Anaconda.bat`. Use the files as supplied for the default package set.
 
-   | File | What belongs here |
-   | --- | --- |
-   | [Anaconda_bootstrap.yml](windows/Anaconda_bootstrap.yml) | The base environment. The supplied manifest includes Python, the package managers, Git, Hatch, Ruff, and mypy. |
-   | [Anaconda.yml](windows/Anaconda.yml) | Project dependencies installed through Conda. The supplied manifest includes Node.js, pytest, NumPy, pandas, and Polars. |
-   | [Anaconda.txt](windows/Anaconda.txt) | Python requirements installed with uv after the Conda packages. The supplied file adds `flowmark`. |
+| File                                                     | What belongs here                                                                                          |
+| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| [Anaconda_bootstrap.yml](windows/Anaconda_bootstrap.yml) | Conda packages forming the base environment, such as pytest, package managers, Git, Hatch, Ruff, and mypy. |
+| [Anaconda.yml](windows/Anaconda.yml)                     | Conda packages required by the project., such as Node.js, NumPy, pandas, and Polars.                       |
+| [Anaconda.txt](windows/Anaconda.txt)                     | PyPi packages usually not available from Conda.                                                            |
 
 3. On x64 Windows, open a Command Prompt without an active Python or Conda environment and run the copied bootstrap. It uses `curl.exe` and `tar.exe`.
 
-   ```bat
-   cd /d D:\Dev\MyProject
-   Anaconda.bat
-   ```
+```bat
+cd /d D:\Dev\MyProject
+Anaconda.bat
+```
 
 ### Use the installed environment
 

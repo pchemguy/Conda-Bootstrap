@@ -13,3 +13,11 @@ dependencies:
   - hatch
   - ruff
   - mypy
+  - coverage
+  - pyinstrument
+  - pyperf
+  - pytest
+  - pytest-benchmark
+  - pytest-cov
+  - pytest-asyncio
+  - pytest-timeout
