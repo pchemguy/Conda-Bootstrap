@@ -1,3 +1,8 @@
+---
+project: https://chatgpt.com/g/g-p-6afc2115d3b481918cfff04fa63d722d
+url: https://chatgpt.com/c/6afc32cd-eb8c-83e9-a6ee-3c2cbe3b1a4d
+---
+
 # Conda Bootstrap
 
 Conda Bootstrap uses Micromamba to create a project-local Python environment on Windows (CMD) or Linux (Bash), without a preinstalled Python or Conda. Both harnesses install Python, Conda, Mamba, Micromamba, and uv in a directory named after the bootstrap script. This directory is the environment’s *prefix*. Edit the adjacent manifests to choose packages, then activate the prefix in the shell where you work.
