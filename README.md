@@ -21,20 +21,20 @@ Use `Anaconda.txt` for packages or builds you want from PyPI, an alternate index
 | `Anaconda_extra.yml` | Optional Conda packages installed on request. | — | [Node.js, PyYAML, NumPy, pandas, Polars, and other libraries](linux/Anaconda_extra.yml) |
 
 <details>
-<summary>Requirements examples for an alternate index and a direct wheel</summary>
+<summary>Requirements examples for an alternate index and a direct wheel</summary><br>
 
-To add the PyTorch CUDA index for `torch`, put these lines in `Anaconda.txt`.
+To add the PyTorch CUDA index for `torch`, put these lines in `Anaconda.txt`.<br><br>
 
-```text
---extra-index-url https://download.pytorch.org/whl/cu129
-torch
-```
+```text<br>
+--extra-index-url https://download.pytorch.org/whl/cu129<br>
+torch<br>
+```<br><br>
 
-To install spaCy’s small English pipeline, `en_core_web_sm`, put its release wheel URL on a line in `Anaconda.txt`.
+To install spaCy’s small English pipeline, `en_core_web_sm`, put its release wheel URL on a line in `Anaconda.txt`.<br><br>
 
-```text
-https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl
-```
+```text<br>
+https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl<br>
+```<br>
 
 </details>
 
