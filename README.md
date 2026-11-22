@@ -21,14 +21,19 @@ Use `Anaconda.txt` for packages or builds you want from PyPI, an alternate index
 | `Anaconda_extra.yml` | Optional Conda packages installed on request. | — | [Node.js, PyYAML, NumPy, pandas, Polars, and other libraries](linux/Anaconda_extra.yml) |
 
 <details>
-<summary>Windows requirements example for GPU packages</summary>
+<summary>Requirements examples for an alternate index and a direct wheel</summary>
 
-In `Anaconda.txt`, an `--extra-index-url` line adds a package index for named requirements such as `torch`. A wheel URL on its own line requests that exact file. The PaddlePaddle wheel below requires CPython 3.11 on x64 Windows. To use it, select `python=3.11` in `Anaconda_bootstrap.yml` before creating the environment.
+To add the PyTorch CUDA index for `torch`, put these lines in `Anaconda.txt`.
 
 ```text
 --extra-index-url https://download.pytorch.org/whl/cu129
 torch
-https://paddle-qa.bj.bcebos.com/paddle-pipeline/Develop-TagBuild-Training-Windows-Gpu-Cuda12.9-Cudnn9.9-Trt10.5-Mkl-Avx-VS2019-SelfBuiltPypiUse/86d658f56ebf3a5a7b2b33ace48f22d10680d311/paddlepaddle_gpu-3.0.0.dev20250717-cp311-cp311-win_amd64.whl
+```
+
+To install spaCy’s small English pipeline, `en_core_web_sm`, put its release wheel URL on a line in `Anaconda.txt`.
+
+```text
+https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl
 ```
 
 </details>
