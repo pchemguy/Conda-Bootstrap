@@ -7,7 +7,14 @@ url: https://chatgpt.com/c/6afc32cd-eb8c-83e9-a6ee-3c2cbe3b1a4d
 
 Conda Bootstrap creates a project-local Python environment on Windows or Linux using Micromamba. Copy the files for your platform into the directory that will host the environment, choose the packages in the supplied manifests, and run the bootstrap `Anaconda.bat` once. The default manifests install Python, Conda, Mamba, Micromamba, and uv under `Anaconda/`, beside the bootstrap script. On subsequent visits, use the activation script to work in that environment. No existing Python or Conda installation is required.
 
-The project is focused on creating Conda environments primarily from the `conda-forge`. Other channels may be added by editing the list in the manifest files or relying on local configuration. When required packages are not readily available from Conda (e.g., poorly supported or not available at all), PyPi is used as fallback source. The bootstrap script installs Conda packages first, then PyPi packages using `uv`.
+Conda Bootstrap creates a project-local Python environment on Windows or Linux primarily from the `conda-forge` channel. Other channels may be added by editing the list in the manifest files or relying on local configuration. When required packages are not readily available from Conda (e.g., poorly supported or not available at all), PyPi is used as fallback source. PyPi manifest file is also used for declaring packages from alternative sources, e.g., 
+
+```text
+--extra-index-url https://download.pytorch.org/whl/cu129
+https://paddle-qa.bj.bcebos.com/paddle-pipeline/Develop-TagBuild-Training-Windows-Gpu-Cuda12.9-Cudnn9.9-Trt10.5-Mkl-Avx-VS2019-SelfBuiltPypiUse/86d658f56ebf3a5a7b2b33ace48f22d10680d311/paddlepaddle_gpu-3.0.0.dev20250717-cp311-cp311-win_amd64.whl
+```
+
+The bootstrap script installs Conda packages first, then PyPi packages using `uv`.
 
 ## Windows harness
 
@@ -46,7 +53,7 @@ For an automated build, use `/batch` to activate the calling batch file and cont
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 call "%~dp0conda_far.bat" /batch
-if errorlevel 1 exit /b %errorlevel%
+if not "%ERRORLEVEL%"=="0" exit /b %ERRORLEVEL%
 python --version
 ```
 
