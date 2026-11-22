@@ -61,7 +61,7 @@ To run just one command, use `conda_far.bat /cli "python --version"` from a CMD 
 
 ### How the Windows bootstrap works
 
-[Anaconda.bat](windows/Anaconda.bat) calls `conda_far.bat /cache` to select a shared cache, downloads or reuses Micromamba and uv, and creates `Anaconda\` from the bootstrap YAML. It then calls `conda_far.bat /preactivate` to activate the new environment for the rest of the installation. After verifying Python, it applies `Anaconda.yml` with Mamba. It then processes any `*.req.txt` files with pip, followed by `requirements.txt` and `Anaconda.txt` with uv when present. A full run writes `Anaconda_generated.yml` and `Anaconda.pip.txt` beside the batch file and returns to the original prompt.
+[Anaconda.bat](windows/Anaconda.bat) calls `conda_far.bat /cache` to select a shared cache, downloads or reuses Micromamba and uv, and creates `%~dpn0` (`%~dp0Anaconda` by default) from the bootstrap YAML. It then calls `conda_far.bat /preactivate` to activate the new environment for the rest of the installation. After verifying Python, it applies `Anaconda.yml` with Mamba. It then processes any `*.req.txt` files with pip, followed by `requirements.txt` and `Anaconda.txt` with uv when present. A full run writes `Anaconda_generated.yml` and `Anaconda.pip.txt` beside the batch file and returns to the original prompt.
 
 **Effects on existing caches.** Cache setup replaces `%LOCALAPPDATA%\pip\cache` and `%LOCALAPPDATA%\uv\cache` with junctions to the shared cache. It deletes the contents of ordinary directories at those paths. Set `_CACHE` to an existing writable directory to choose the cache location. On the Conda installation path, the bootstrap also pauses before recursively removing an existing `%APPDATA%\mamba`. The `/q` switch skips that pause and reduces package-manager output.
 
@@ -77,12 +77,12 @@ Copy the **contents** of [linux/](linux/) into the local directory that will hol
 
 Edit the manifests beside [Anaconda.sh](linux/Anaconda.sh) before running it.
 
-| File | How the harness uses it |
-| --- | --- |
-| [Anaconda_bootstrap.yml](linux/Anaconda_bootstrap.yml) | Defines the base. A temporary Micromamba executable installs it into `Anaconda/` on the first run. |
-| [Anaconda.yml](linux/Anaconda.yml) | Adds Conda project packages on a full run. The supplied file includes pytest, coverage, profiling tools, and PyYAML. |
-| [Anaconda.txt](linux/Anaconda.txt) | Adds pip requirements through uv using the prefix’s Python. |
-| [Anaconda_extra.yml](linux/Anaconda_extra.yml) | Provides optional packages such as Node.js, NumPy, pandas, and Polars. Apply this manifest separately when needed. |
+| File                                                   | How the harness uses it                                                                                              |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| [Anaconda_bootstrap.yml](linux/Anaconda_bootstrap.yml) | Defines the base. A temporary Micromamba executable installs it into `Anaconda/` on the first run.                   |
+| [Anaconda.yml](linux/Anaconda.yml)                     | Adds Conda project packages on a full run. The supplied file includes pytest, coverage, profiling tools, and PyYAML. |
+| [Anaconda.txt](linux/Anaconda.txt)                     | Adds pip requirements through uv using the prefix’s Python.                                                          |
+| [Anaconda_extra.yml](linux/Anaconda_extra.yml)         | Provides optional packages such as Node.js, NumPy, pandas, and Polars. Apply this manifest separately when needed.   |
 
 From the directory containing the copied files, run the bootstrap and source the launcher it generates.
 
