@@ -13,12 +13,12 @@ Use the YAML manifests for Conda packages. They specify `conda-forge` with `node
 
 Use `Anaconda.txt` for packages or builds you want from PyPI, an alternate index, or a direct wheel URL. After the Conda packages install successfully, uv installs the requirements listed there. If a Conda build is unavailable and a suitable wheel exists, declare it in `Anaconda.txt` and remove the Conda requirement. A failed Conda solve stops the bootstrap.
 
-| File | When it is used | Windows defaults | Linux defaults |
-| --- | --- | --- | --- |
-| `Anaconda_bootstrap.yml` | Creates the base environment on first install. | [Python and package managers, Git, Hatch, Ruff, mypy, pytest and plugins, coverage, and profiling tools](windows/Anaconda_bootstrap.yml) | [Python and package managers, Git, Hatch, Ruff, and mypy](linux/Anaconda_bootstrap.yml) |
-| `Anaconda.yml` | Adds Conda project dependencies on a full run. | [Node.js, PyYAML, NumPy, pandas, Polars, and other libraries](windows/Anaconda.yml) | [pytest and plugins, coverage, pyinstrument, and pyperf](linux/Anaconda.yml) |
-| `Anaconda.txt` | Installs pip-style requirements into the same environment with uv. | [flowmark](windows/Anaconda.txt) | [flowmark](linux/Anaconda.txt) |
-| `Anaconda_extra.yml` | Optional Conda packages installed on request. | — | [Node.js, PyYAML, NumPy, pandas, Polars, and other libraries](linux/Anaconda_extra.yml) |
+| File                     | When it is used                                                    | Windows defaults                                                                                                                         | Linux defaults                                                                          |
+| ------------------------ | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `Anaconda_bootstrap.yml` | Creates the base environment on first install.                     | [Python and package managers, Git, Hatch, Ruff, mypy, pytest and plugins, coverage, and profiling tools](windows/Anaconda_bootstrap.yml) | [Python and package managers, Git, Hatch, Ruff, and mypy](linux/Anaconda_bootstrap.yml) |
+| `Anaconda.yml`           | Adds Conda project dependencies on a full run.                     | [Node.js, PyYAML, NumPy, pandas, Polars, and other libraries](windows/Anaconda.yml)                                                      | [pytest and plugins, coverage, pyinstrument, and pyperf](linux/Anaconda.yml)            |
+| `Anaconda.txt`           | Installs pip-style requirements into the same environment with uv. | [flowmark](windows/Anaconda.txt)                                                                                                         | [flowmark](linux/Anaconda.txt)                                                          |
+| `Anaconda_extra.yml`     | Optional Conda packages installed on request.                      | —                                                                                                                                        | [Node.js, PyYAML, NumPy, pandas, Polars, and other libraries](linux/Anaconda_extra.yml) |
 
 <details>
 <summary>Requirements examples for an alternate index and a direct wheel</summary><br>
