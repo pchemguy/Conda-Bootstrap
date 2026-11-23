@@ -32,6 +32,7 @@ echo:
 
 set "EXIT_STATUS=0"
 set "_VCVARS="
+set "VCVARS64=VC\Auxiliary\Build\vcvars64.bat"
 
 :: --- 1. Check if already activated ---
 
@@ -39,28 +40,22 @@ echo %INFO% MSBuild: Checking if MSBuild environment is already activated...
 if defined VSINSTALLDIR (
     echo %INFO% MSBuild: VSINSTALLDIR points to "%VSINSTALLDIR%".
     echo %OKOK% MSBuild: MSBuild environment already active. Skipping activation.
-    set "EXIT_STATUS=0"
-    goto :MSBUILD_ACTIVATED
-)
-
-if not exist "%VCINSTALLDIR%" (
-    echo %ERROR% MSBuild: MS Build Tools activation failed.
-    goto :MAIN_EXIT
-)
-
-:MSBUILD_ACTIVATED
-
-call :VERIFY_TOOLS || (
+    call :VERIFY_ACTIVATION
     set "EXIT_STATUS=!ERRORLEVEL!"
-    echo %ERROR% MSBuild: MS Build Tools verification failed.
     goto :MAIN_EXIT
 )
 
-set "EXIT_STATUS=0"
-echo %OKOK% MSBuild: MS Build Tools are ready..
-echo %OKOK% MSBuild: VSINSTALLDIR points to "%VSINSTALLDIR%".
-echo --------------------------------------------------------------------------------
-echo:
+:: --- 2. Check explicit environment variable VCVARS ---
+
+call :VCVARS_CHECK      && call :MSBUILD_ACTIVATION && call :VERIFY_ACTIVATION && goto :MAIN_EXIT
+
+:: --- 3. Check default and custom MSVS locations ---
+
+call :MSVS_LOCATIONS    && call :MSBUILD_ACTIVATION && call :VERIFY_ACTIVATION && goto :MAIN_EXIT
+
+:: --- 4. Check BuildTools locations ---
+
+call :MSBUILD_LOCATIONS && call :MSBUILD_ACTIVATION && call :VERIFY_ACTIVATION && goto :MAIN_EXIT
 
 :MAIN_EXIT
 
@@ -73,6 +68,98 @@ endlocal && exit /b %EXIT_STATUS%
 :: ############################################################################
 :: ############################################################################
 :: ############################################################################
+
+
+:: ============================================================================ VCVARS_CHECK BEGIN
+:: ============================================================================
+:VCVARS_CHECK
+
+set "_EXIT_STATUS=0"
+
+echo %INFO% MSBuild: Checking if VCVARS points to vcvarsall.bat or vcvars64.bat.
+if not defined VCVARS (
+    call :WHERE_CLI "vcvars64.bat" "VCVARS64_BAT" || (exit /b 1)
+    set "VCVARS=%CLIPATH%"
+)
+
+set "VCVARS=%VCVARS:"=%"
+echo %INFO% MSBuild: VCVARS = "%VCVARS%".
+
+set "_VCVARS=%VCVARS:vcvarsall.bat=vcvars64.bat%"
+if not "%_VCVARS:~-12%"=="vcvars64.bat" (set "_VCVARS=")
+
+if exist "%_VCVARS%" (
+    echo %INFO% MSBuild: Attempting activation...
+    exit /b 0
+) else (
+    set "_VCVARS="
+)
+
+set "_EXIT_STATUS=1"
+
+if not defined _EXIT_STATUS (set "_EXIT_STATUS=0")
+exit /b %_EXIT_STATUS%
+:: ============================================================================
+:: ============================================================================ VCVARS_CHECK END
+
+
+:: ============================================================================ MSVS_LOCATIONS BEGIN
+:: ============================================================================
+:MSVS_LOCATIONS
+
+set "_EXIT_STATUS=0"
+
+for %%P in (
+    "%ProgramFiles%\Microsoft Visual Studio" 
+    "%ProgramFiles(x86)%\Microsoft Visual Studio"
+    "%~dp0..\Microsoft Visual Studio"
+) do (
+    echo %INFO% MSBuild: Checking for VS editions in "%%~P\{VERSION}\{KIND}".
+    for /f "usebackq delims=" %%Y in (`dir /b /ad /O:-N "%%~P" 2^>nul`) do (
+        for /d %%E in ("%%~P\%%Y\*") do (
+            if exist "%%~fE\%VCVARS64%" (
+               set "_VCVARS=%%~fE\%VCVARS64%"
+               exit /b 0
+            )
+        )
+    )
+)
+
+set "_EXIT_STATUS=1"
+
+if not defined _EXIT_STATUS (set "_EXIT_STATUS=0")
+exit /b %_EXIT_STATUS%
+:: ============================================================================
+:: ============================================================================ MSVS_LOCATIONS END
+
+
+:: ============================================================================ MSBUILD_LOCATIONS BEGIN
+:: ============================================================================
+:MSBUILD_LOCATIONS
+
+set "_EXIT_STATUS=0"
+
+echo %INFO% MSBuild: Checking if BUILDTOOLS or MSBUILDTOOLS point to the "BuildTools" directory and fallback locations.
+for %%D in (
+    "%~dp0..\MSBuildTools"
+    "%~dp0..\BuildTools"
+    "%~d0\dev\MSBuildTools"
+    "%~d0\dev\BuildTools"
+    "%MSBUILDTOOLS%"
+    "%BUILDTOOLS%"
+) do (
+    if exist "%%~fD\%VCVARS64%" (
+        set "_VCVARS=%%~fD\%VCVARS64%"
+        exit /b 0
+    )
+)
+
+set "_EXIT_STATUS=1"
+
+if not defined _EXIT_STATUS (set "_EXIT_STATUS=0")
+exit /b %_EXIT_STATUS%
+:: ============================================================================
+:: ============================================================================ MSBUILD_LOCATIONS END
 
 
 :: ============================================================================ MSBUILD_ACTIVATION BEGIN
@@ -89,10 +176,16 @@ echo:
 call "%_VCVARS%" || (
     echo:
     echo %ERROR% MSBuild: "%_VCVARS%" returned an error.
+    exit /b 1
+) 
+
+if not exist "%VCINSTALLDIR%" (
+    echo %ERROR% MSBuild: MS Build Tools activation failed.
     set "_EXIT_STATUS=1"
 ) else (
     echo %INFO% MSBuild: MS Build Tools activation succeeded.
-    echo %INFO% MSBuild: Proceeding to verification.
+    echo %INFO% MSBuild: Staus pending verification.
+    set "_EXIT_STATUS=0"
 )
 
 if not defined _EXIT_STATUS (set "_EXIT_STATUS=0")
@@ -101,12 +194,16 @@ exit /b %_EXIT_STATUS%
 :: ============================================================================ MSBUILD_ACTIVATION END
 
 
-:: ============================================================================ VERIFY_TOOLS BEGIN
+:: ============================================================================ VERIFY_ACTIVATION BEGIN
 :: ============================================================================
-:VERIFY_TOOLS
+:VERIFY_ACTIVATION
 
 setlocal
 set "EXIT_STATUS=0"
+
+echo:
+echo %WARN% Verifying activation.
+echo:
 
 if defined VisualStudioVersion (
     echo %INFO% VisualStudioVersion=%VisualStudioVersion%
@@ -152,22 +249,27 @@ if not exist "%windir%\System32\tar.exe" (
     set "EXIT_STATUS=1"
 )
 
-if "%USE_ICU%"=="1" if "%EXIT_STATUS%"=="0" (
+if "%USE_ICU%"=="1" (
     call :CHECK_ICU_MACHINE || set "EXIT_STATUS=1"
 )
 
 echo:
+
 if "%EXIT_STATUS%"=="0" (
-    echo %OKOK% Environment is OK
+    echo %OKOK% MSBuild: MS Build Tools are ready..
+    echo %OKOK% MSBuild: VSINSTALLDIR points to "%VSINSTALLDIR%".
 ) else (
-    echo %ERROR% Environment is NOT OK
+    echo %ERROR% MSBuild: MS Build Tools verification failed.
 )
+
+echo:
+echo --------------------------------------------------------------------------------
 echo:
 
 if not defined EXIT_STATUS (set "EXIT_STATUS=0")
 endlocal && exit /b %EXIT_STATUS%
 :: ============================================================================
-:: ============================================================================ VERIFY_TOOLS END
+:: ============================================================================ VERIFY_ACTIVATION END
 
 
 :: ============================================================================ WHERE_CLI BEGIN
