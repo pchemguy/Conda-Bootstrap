@@ -30,8 +30,28 @@ echo ===========================================================================
 echo ====================================================================================
 echo:
 
+call :VERIFY_TOOLS || (set "ERROR_STATUS=!ERRORLEVEL!")
+
+endlocal && exit /b %ERROR_STATUS%
+:: ============================================================================
+:: ============================================================================ MAIN END
+
+
+:: ############################################################################
+:: ############################################################################
+:: ############################################################################
+
+
+:: ============================================================================ VERIFY_TOOLS BEGIN
+:: ============================================================================
+:VERIFY_TOOLS
+
+setlocal
+set "ERROR_STATUS=0"
+
 if defined VisualStudioVersion% (
     echo %INFO% VisualStudioVersion=%VisualStudioVersion%
+    echo:
 ) else (
     echo %ERROR% VisualStudioVersion is not set.
     set "ERROR_STATUS=1"
@@ -58,13 +78,15 @@ if not defined EXPECTED_MACHINE (
 
 call :WHERE_CLI "nmake.exe"    "NMAKE_EXE"     || (set "ERROR_STATUS=!ERRORLEVEL!")
 call :WHERE_CLI "cl.exe"       "CL_EXE"        || (set "ERROR_STATUS=!ERRORLEVEL!")
+set "CL_EXE=%CLIPATH%"
 call :WHERE_CLI "link.exe"     "LINK_EXE"      || (set "ERROR_STATUS=!ERRORLEVEL!")
+set "LINK_EXE=%CLIPATH%"
 call :WHERE_CLI "lib.exe"      "LIB_EXE"       || (set "ERROR_STATUS=!ERRORLEVEL!")
 call :WHERE_CLI "dumpbin.exe"  "DUMPBIN_EXE"   || (set "ERROR_STATUS=!ERRORLEVEL!")
 call :WHERE_CLI "curl.exe"     "CURL_EXE"      || (set "ERROR_STATUS=!ERRORLEVEL!")
 call :WHERE_CLI "tclsh.exe"    "TCLSH_EXE"   "True"
 
-call :VERIFY_MS_LINKER || set "ERROR_STATUS=1"
+if defined CL_EXE call :VERIFY_MS_LINKER "%CL_EXE%" "%LINK_EXE%" || set "ERROR_STATUS=1"
 
 if not exist "%windir%\System32\tar.exe" (
     echo %ERROR% Windows tar is not found at "%windir%\System32\tar.exe".
@@ -86,57 +108,7 @@ echo:
 
 endlocal && exit /b %ERROR_STATUS%
 :: ============================================================================
-:: ============================================================================ MAIN END
-
-
-:: ############################################################################
-:: ############################################################################
-:: ############################################################################
-
-
-:: ============================================================================ VERIFY_MS_LINKER BEGIN
-:: ============================================================================
-:VERIFY_MS_LINKER
-
-where.exe /q link.exe
-if not "%ERRORLEVEL%"=="0" (
-    echo %ERROR% MSBuild: Linker link.exe not found on PATH.
-    exit /b 1
-)
-
-set "_CL_EXE="
-set "_CL_DIR="
-for /f "usebackq delims=" %%C in (`where.exe cl.exe 2^>nul`) do if not defined _CL_EXE (
-    set "_CL_EXE=%%~fC"
-    set "_CL_DIR=%%~dpC"
-)
-
-set "_LINK_EXE="
-set "_LINK_DIR="
-for /f "usebackq delims=" %%L in (`where.exe link.exe 2^>nul`) do if not defined _LINK_EXE (
-    set "_LINK_EXE=%%~fL"
-    set "_LINK_DIR=%%~dpL"
-)
-
-link.exe /? 2>&1 | findstr.exe /i /c:"Microsoft (R) Incremental Linker" /c:"/INCREMENTAL" >nul
-if not "%ERRORLEVEL%"=="0" (
-    echo %ERROR% MSBuild: Linker collision detected: link.exe is not the Microsoft Incremental Linker.
-    echo %ERROR% MSBuild: Executing link.exe resolved to "%_LINK_EXE%" -- likely MSYS/Git/GNU link.exe.
-    echo %ERROR% MSBuild: Expected MSVC toolset directory: "%_CL_DIR%".
-    exit /b 1
-)
-
-if /i not "%_LINK_DIR%"=="%_CL_DIR%" (
-    echo %ERROR% MSBuild: Linker collision detected: link.exe directory does not match active cl.exe directory.
-    echo %ERROR% MSBuild: Resolved link.exe: "%_LINK_EXE%"
-    echo %ERROR% MSBuild: Active cl.exe:     "%_CL_EXE%"
-    exit /b 1
-)
-
-echo %INFO%              Verified Microsoft linker.
-exit /b 0
-:: ============================================================================
-:: ============================================================================ VERIFY_MS_LINKER END
+:: ============================================================================ VERIFY_TOOLS END
 
 
 :: ============================================================================ WHERE_CLI BEGIN
@@ -180,6 +152,43 @@ if not defined _ERROR_STATUS (set "_ERROR_STATUS=0")
 exit /b %_ERROR_STATUS%
 :: ============================================================================
 :: ============================================================================ WHERE_CLI END
+
+
+:: ============================================================================ VERIFY_MS_LINKER BEGIN
+:: ============================================================================
+:VERIFY_MS_LINKER
+:: ---------------------------------------------------------------------
+:: %1 - cl.exe path.
+:: %2 - link.exe path.
+:: ---------------------------------------------------------------------
+
+set "_CL_EXE=%~f1"
+set "_CL_DIR=%~dp1"
+
+set "_LINK_EXE=%~f2"
+set "_LINK_DIR=%~dp2"
+
+link.exe /? 2>&1 | findstr.exe /i /c:"Microsoft (R) Incremental Linker" /c:"/INCREMENTAL" >nul
+if not "%ERRORLEVEL%"=="0" (
+    echo %ERROR% MSBuild: Linker collision detected: link.exe is not the Microsoft Incremental Linker.
+    echo %ERROR% MSBuild: Executing link.exe resolved to "%_LINK_EXE%" -- likely MSYS/Git/GNU link.exe.
+    echo %ERROR% MSBuild: Expected MSVC toolset directory: "%_CL_DIR%".
+    exit /b 1
+)
+
+if /i not "%_LINK_DIR%"=="%_CL_DIR%" (
+    echo %ERROR% MSBuild: Linker collision detected: link.exe directory does not match active cl.exe directory.
+    echo %ERROR% MSBuild: Resolved link.exe: "%_LINK_EXE%"
+    echo %ERROR% MSBuild: Active cl.exe:     "%_CL_EXE%"
+    exit /b 1
+)
+
+echo:
+echo %INFO% Verified Microsoft linker.
+echo:
+exit /b 0
+:: ============================================================================
+:: ============================================================================ VERIFY_MS_LINKER END
 
 
 :: ============================================================================ CHECK_ICU_MACHINE BEGIN
