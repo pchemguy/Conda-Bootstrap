@@ -15,7 +15,7 @@
 
 setlocal EnableExtensions EnableDelayedExpansion
 
-set "ERROR_STATUS=0"
+set "EXIT_STATUS=0"
 
 call :COLOR_SCHEME
 
@@ -30,9 +30,42 @@ echo ===========================================================================
 echo ====================================================================================
 echo:
 
-call :VERIFY_TOOLS || (set "ERROR_STATUS=!ERRORLEVEL!")
+set "EXIT_STATUS=0"
+set "_VCVARS="
 
-endlocal && exit /b %ERROR_STATUS%
+:: --- 1. Check if already activated ---
+
+echo %INFO% MSBuild: Checking if MSBuild environment is already activated...
+if defined VSINSTALLDIR (
+    echo %INFO% MSBuild: VSINSTALLDIR points to "%VSINSTALLDIR%".
+    echo %OKOK% MSBuild: MSBuild environment already active. Skipping activation.
+    set "EXIT_STATUS=0"
+    goto :MSBUILD_ACTIVATED
+)
+
+if not exist "%VCINSTALLDIR%" (
+    echo %ERROR% MSBuild: MS Build Tools activation failed.
+    goto :MAIN_EXIT
+)
+
+:MSBUILD_ACTIVATED
+
+call :VERIFY_TOOLS || (
+    set "EXIT_STATUS=!ERRORLEVEL!"
+    echo %ERROR% MSBuild: MS Build Tools verification failed.
+    goto :MAIN_EXIT
+)
+
+set "EXIT_STATUS=0"
+echo %OKOK% MSBuild: MS Build Tools are ready..
+echo %OKOK% MSBuild: VSINSTALLDIR points to "%VSINSTALLDIR%".
+echo --------------------------------------------------------------------------------
+echo:
+
+:MAIN_EXIT
+
+if not defined EXIT_STATUS (set "EXIT_STATUS=0")
+endlocal && exit /b %EXIT_STATUS%
 :: ============================================================================
 :: ============================================================================ MAIN END
 
@@ -42,19 +75,45 @@ endlocal && exit /b %ERROR_STATUS%
 :: ############################################################################
 
 
+:: ============================================================================ MSBUILD_ACTIVATION BEGIN
+:: ============================================================================
+:MSBUILD_ACTIVATION
+
+set "_EXIT_STATUS=0"
+
+set "VSCMD_SKIP_SENDTELEMETRY=1"
+echo:
+echo %WARN% MSBuild: Activating MS Build Tools.
+echo %INFO% MSBuild: Calling "%_VCVARS%"
+echo:
+call "%_VCVARS%" || (
+    echo:
+    echo %ERROR% MSBuild: "%_VCVARS%" returned an error.
+    set "_EXIT_STATUS=1"
+) else (
+    echo %INFO% MSBuild: MS Build Tools activation succeeded.
+    echo %INFO% MSBuild: Proceeding to verification.
+)
+
+if not defined _EXIT_STATUS (set "_EXIT_STATUS=0")
+exit /b %_EXIT_STATUS%
+:: ============================================================================
+:: ============================================================================ MSBUILD_ACTIVATION END
+
+
 :: ============================================================================ VERIFY_TOOLS BEGIN
 :: ============================================================================
 :VERIFY_TOOLS
 
 setlocal
-set "ERROR_STATUS=0"
+set "EXIT_STATUS=0"
 
-if defined VisualStudioVersion% (
+if defined VisualStudioVersion (
     echo %INFO% VisualStudioVersion=%VisualStudioVersion%
     echo:
 ) else (
     echo %ERROR% VisualStudioVersion is not set.
-    set "ERROR_STATUS=1"
+    set "EXIT_STATUS=1"
 )
 
 set "PAD10=          "
@@ -65,7 +124,7 @@ if exist "%VCINSTALLDIR%" (
     echo %INFO% %TOOL_LABEL% %VCINSTALLDIR%
 ) else (
     echo %ERROR% VCINSTALLDIR is not set.
-    set "ERROR_STATUS=1"
+    set "EXIT_STATUS=1"
 )
 
 set "EXPECTED_MACHINE="
@@ -73,40 +132,40 @@ if /i "%VSCMD_ARG_TGT_ARCH%"=="x86" set "EXPECTED_MACHINE=14C"
 if /i "%VSCMD_ARG_TGT_ARCH%"=="x64" set "EXPECTED_MACHINE=8664"
 if not defined EXPECTED_MACHINE (
     echo %ERROR% VSCMD_ARG_TGT_ARCH must be x86 or x64; got "!VSCMD_ARG_TGT_ARCH!".
-    set "ERROR_STATUS=1"
+    set "EXIT_STATUS=1"
 )
 
-call :WHERE_CLI "nmake.exe"    "NMAKE_EXE"     || (set "ERROR_STATUS=!ERRORLEVEL!")
-call :WHERE_CLI "cl.exe"       "CL_EXE"        || (set "ERROR_STATUS=!ERRORLEVEL!")
+call :WHERE_CLI "nmake.exe"    "NMAKE_EXE"     || (set "EXIT_STATUS=!ERRORLEVEL!")
+call :WHERE_CLI "cl.exe"       "CL_EXE"        || (set "EXIT_STATUS=!ERRORLEVEL!")
 set "CL_EXE=%CLIPATH%"
-call :WHERE_CLI "link.exe"     "LINK_EXE"      || (set "ERROR_STATUS=!ERRORLEVEL!")
+call :WHERE_CLI "link.exe"     "LINK_EXE"      || (set "EXIT_STATUS=!ERRORLEVEL!")
 set "LINK_EXE=%CLIPATH%"
-call :WHERE_CLI "lib.exe"      "LIB_EXE"       || (set "ERROR_STATUS=!ERRORLEVEL!")
-call :WHERE_CLI "dumpbin.exe"  "DUMPBIN_EXE"   || (set "ERROR_STATUS=!ERRORLEVEL!")
-call :WHERE_CLI "curl.exe"     "CURL_EXE"      || (set "ERROR_STATUS=!ERRORLEVEL!")
+call :WHERE_CLI "lib.exe"      "LIB_EXE"       || (set "EXIT_STATUS=!ERRORLEVEL!")
+call :WHERE_CLI "dumpbin.exe"  "DUMPBIN_EXE"   || (set "EXIT_STATUS=!ERRORLEVEL!")
+call :WHERE_CLI "curl.exe"     "CURL_EXE"      || (set "EXIT_STATUS=!ERRORLEVEL!")
 call :WHERE_CLI "tclsh.exe"    "TCLSH_EXE"   "True"
 
-if defined CL_EXE call :VERIFY_MS_LINKER "%CL_EXE%" "%LINK_EXE%" || set "ERROR_STATUS=1"
+if defined CL_EXE call :VERIFY_MS_LINKER "%CL_EXE%" "%LINK_EXE%" || set "EXIT_STATUS=1"
 
 if not exist "%windir%\System32\tar.exe" (
     echo %ERROR% Windows tar is not found at "%windir%\System32\tar.exe".
-    set "ERROR_STATUS=1"
+    set "EXIT_STATUS=1"
 )
 
-if "%USE_ICU%"=="1" if "%ERROR_STATUS%"=="0" (
-    call :CHECK_ICU_MACHINE || set "ERROR_STATUS=1"
+if "%USE_ICU%"=="1" if "%EXIT_STATUS%"=="0" (
+    call :CHECK_ICU_MACHINE || set "EXIT_STATUS=1"
 )
 
 echo:
-if "%ERROR_STATUS%"=="0" (
+if "%EXIT_STATUS%"=="0" (
     echo %OKOK% Environment is OK
 ) else (
     echo %ERROR% Environment is NOT OK
 )
-echo --------------------------------------------------------------------------------
 echo:
 
-endlocal && exit /b %ERROR_STATUS%
+if not defined EXIT_STATUS (set "EXIT_STATUS=0")
+endlocal && exit /b %EXIT_STATUS%
 :: ============================================================================
 :: ============================================================================ VERIFY_TOOLS END
 
@@ -120,7 +179,7 @@ endlocal && exit /b %ERROR_STATUS%
 :: %3 - If TRUE, treat as optional dependency {WARN, not ERROR}.
 :: ---------------------------------------------------------------------
 
-set "_ERROR_STATUS=0"
+set "_EXIT_STATUS=0"
 set "TOOL=%~1"
 set "PAD10=          "
 set "WIDTH=15"
@@ -144,12 +203,12 @@ if defined CLIPATH (
     echo %INFO% %TOOL_LABEL% %CLIPATH%
 ) else (
     echo %LEVEL% %TOOL_LABEL% is not found.
-    set "_ERROR_STATUS=1"
+    set "_EXIT_STATUS=1"
 )
-if /i "%~3"=="TRUE" (set "_ERROR_STATUS=0")
+if /i "%~3"=="TRUE" (set "_EXIT_STATUS=0")
 
-if not defined _ERROR_STATUS (set "_ERROR_STATUS=0")
-exit /b %_ERROR_STATUS%
+if not defined _EXIT_STATUS (set "_EXIT_STATUS=0")
+exit /b %_EXIT_STATUS%
 :: ============================================================================
 :: ============================================================================ WHERE_CLI END
 
