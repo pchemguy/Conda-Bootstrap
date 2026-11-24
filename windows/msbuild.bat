@@ -51,9 +51,8 @@ if defined VSINSTALLDIR (
 :: --- 4. MSBUILD_LOCATIONS - Check BuildTools locations                 ---
 
 call :VCVARS_CHECK || call :MSVS_LOCATIONS || call :MSBUILD_LOCATIONS
-if defined _VCVARS (
-    call :MSBUILD_ACTIVATION && call :VERIFY_ACTIVATION || (set "EXIT_STATUS=!ERRORLEVEL!")
-)
+if defined _VCVARS call :MSBUILD_ACTIVATION
+call :VERIFY_ACTIVATION & (set "EXIT_STATUS=!ERRORLEVEL!")
 
 :MAIN_EXIT
 
