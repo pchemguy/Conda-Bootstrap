@@ -53,7 +53,7 @@ if defined VSINSTALLDIR (
 call :VCVARS_CHECK || call :MSVS_LOCATIONS || call :MSBUILD_LOCATIONS
 if defined _VCVARS call :MSBUILD_ACTIVATION
 
-call :VERIFY_ACTIVATION
+call :VERIFY_ACTIVATION || (set "EXIT_STATUS=!ERRORLEVEL!")
 
 :MAIN_EXIT
 
@@ -77,12 +77,9 @@ set "_EXIT_STATUS=0"
 echo %INFO% MSBuild: Checking if VCVARS points to vcvarsall.bat or vcvars64.bat.
 if not defined VCVARS (
     call :WHERE_CLI "vcvars64.bat" "VCVARS64_BAT" "True"
+    set "VCVARS=!CLIPATH!"
 )
-if exist "%CLIPATH%" (
-    set "VCVARS=%CLIPATH:"=%"
-) else (
-    exit /b 1
-)
+if not exist "%VCVARS%" (exit /b 1)
 
 echo %INFO% MSBuild: VCVARS = "%VCVARS%".
 
@@ -348,6 +345,12 @@ echo:
 link.exe /? 2>&1 | findstr.exe /i /c:"Microsoft (R) Incremental Linker" /c:"/INCREMENTAL" >nul
 set "EXIT_STATUS=%ERRORLEVEL%"
 
+if /i not "%_LINK_DIR%"=="%_CL_DIR%" (
+    echo %WARN% MSBuild: link.exe directory does not match active cl.exe directory.
+    echo %INFO% MSBuild: Resolved link.exe: "%_LINK_EXE%"
+    echo %INFO% MSBuild: Active cl.exe:     "%_CL_EXE%"
+)
+
 if "%EXIT_STATUS%"=="0" (
     echo %INFO% Verified Microsoft linker.
     goto :VERIFY_MS_LINKER_EXIT
@@ -358,11 +361,6 @@ if "%EXIT_STATUS%"=="0" (
 echo %ERROR% MSBuild: Linker collision detected: link.exe is not the Microsoft Incremental Linker.
 echo %INFO% MSBuild: Executing link.exe resolved to "%_LINK_EXE%" -- likely MSYS/Git/GNU link.exe.
 echo %INFO% MSBuild: Expected MSVC toolset directory: "%_CL_DIR%".
-if /i not "%_LINK_DIR%"=="%_CL_DIR%" (
-    echo %INFO% MSBuild: link.exe directory does not match active cl.exe directory.
-    echo %INFO% MSBuild: Resolved link.exe: "%_LINK_EXE%"
-    echo %INFO% MSBuild: Active cl.exe:     "%_CL_EXE%"
-)
 echo:
 
 rem If the offending link.exe does not belong to a local conda environment
@@ -382,8 +380,18 @@ ren "%_LINK_EXE%" "link_.exe" || (
     goto :VERIFY_MS_LINKER_EXIT
 )
 
+call :WHERE_CLI "cl.exe" "CL_EXE"
+set "CL_EXE=%CLIPATH%"
+call :WHERE_CLI "link.exe" "LINK_EXE"
+set "LINK_EXE=%CLIPATH%"
+
 link.exe /? 2>&1 | findstr.exe /i /c:"Microsoft (R) Incremental Linker" /c:"/INCREMENTAL" >nul
 set "EXIT_STATUS=%ERRORLEVEL%"
+
+if not "%CL_EXE:cl.exe=%"=="%LINK_EXE:link.exe=%" (
+    echo %ERROR% MSBuild: Linker and compiler are not in the same directory.
+    set "EXIT_STATUS=1"
+)
 
 if "%EXIT_STATUS%"=="0" (
     echo %WARN% Renamed the offending link.exe to link_.exe and Verified Microsoft linker.
