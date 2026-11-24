@@ -51,9 +51,9 @@ if defined VSINSTALLDIR (
 :: --- 4. MSBUILD_LOCATIONS - Check BuildTools locations                 ---
 
 call :VCVARS_CHECK || call :MSVS_LOCATIONS || call :MSBUILD_LOCATIONS
-if defined _VCVARS call :MSBUILD_ACTIVATION
-
-call :VERIFY_ACTIVATION || (set "EXIT_STATUS=!ERRORLEVEL!")
+if defined _VCVARS (
+    call :MSBUILD_ACTIVATION && call :VERIFY_ACTIVATION || (set "EXIT_STATUS=!ERRORLEVEL!")
+)
 
 :MAIN_EXIT
 
@@ -84,7 +84,7 @@ if not exist "%VCVARS%" (exit /b 1)
 echo %INFO% MSBuild: VCVARS = "%VCVARS%".
 
 set "_VCVARS=%VCVARS:vcvarsall.bat=vcvars64.bat%"
-if not "%_VCVARS:~-12%"=="vcvars64.bat" (set "_VCVARS=")
+if /i not "%_VCVARS:~-12%"=="vcvars64.bat" (set "_VCVARS=")
 
 if exist "%_VCVARS%" (
     echo %INFO% MSBuild: Attempting activation...
