@@ -334,6 +334,12 @@ exit /b %_EXIT_STATUS%
 :: %2 - link.exe path.
 :: ---------------------------------------------------------------------
 
+setlocal
+set "EXIT_STATUS=0"
+
+echo %WARN% Verifying MS linker.
+echo:
+
 set "_CL_EXE=%~f1"
 set "_CL_DIR=%~dp1"
 
@@ -343,22 +349,26 @@ set "_LINK_DIR=%~dp2"
 echo:
 
 link.exe /? 2>&1 | findstr.exe /i /c:"Microsoft (R) Incremental Linker" /c:"/INCREMENTAL" >nul
-if not "%ERRORLEVEL%"=="0" (
+set "EXIT_STATUS=%ERRORLEVEL%"
+
+if not "%EXIT_STATUS%"=="0" (
     echo %ERROR% MSBuild: Linker collision detected: link.exe is not the Microsoft Incremental Linker.
     echo %ERROR% MSBuild: Executing link.exe resolved to "%_LINK_EXE%" -- likely MSYS/Git/GNU link.exe.
     echo %ERROR% MSBuild: Expected MSVC toolset directory: "%_CL_DIR%".
-    exit /b 1
+    set "EXIT_STATUS=1"
 )
 
 if /i not "%_LINK_DIR%"=="%_CL_DIR%" (
     echo %ERROR% MSBuild: Linker collision detected: link.exe directory does not match active cl.exe directory.
     echo %ERROR% MSBuild: Resolved link.exe: "%_LINK_EXE%"
     echo %ERROR% MSBuild: Active cl.exe:     "%_CL_EXE%"
-    exit /b 1
+    set "EXIT_STATUS=1"
 )
 
 echo %INFO% Verified Microsoft linker.
-exit /b 0
+
+if not defined EXIT_STATUS (set "EXIT_STATUS=0")
+endlocal && exit /b %EXIT_STATUS%
 :: ============================================================================
 :: ============================================================================ VERIFY_MS_LINKER END
 
