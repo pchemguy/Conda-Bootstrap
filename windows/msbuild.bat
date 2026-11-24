@@ -1,12 +1,11 @@
 @echo off
 
 :: ============================================================================
-:: Activate the MSVC build environment for an x64 target in the current CMD.
-:: Reuse a verified environment or find and call vcvars64.bat.
-:: Set NOCOLOR for plain output. Caller delayed expansion is optional.
-:: Returns 0 for a verified environment or 1 on failure.
-:: When USE_ICU=1, the check Conda ICU DLL architecture.
-:: See msbuild.md for configuration, discovery, and troubleshooting.
+:: Call from CMD with command extensions and delayed expansion enabled.
+:: Verify an active x86/x64 MSVC environment or locate and call vcvars64.bat.
+:: Final verification returns 0 on success or 1 on failure.
+:: For SQLite builds, USE_ICU=1 also checks DLLs in the active Conda prefix.
+:: See msbuild.md for discovery, linker collision recovery, and usage.
 :: ============================================================================
 
 :: ============================================================================ MAIN BEGIN
