@@ -410,7 +410,7 @@ endlocal & exit /b %EXIT_STATUS%
 :CHECK_ICU_MACHINE
 
 if not defined CONDA_PREFIX (
-    echo %ERROR% USE_ICU=1 requires an active Conda environment.
+    echo %ERROR% USE_ICU=1 requires CONDA_PREFIX pointing to an active Conda environment.
     exit /b 1
 )
 set "ICU_BIN=%CONDA_PREFIX%\Library\bin"
