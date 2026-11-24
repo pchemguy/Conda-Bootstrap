@@ -13,8 +13,6 @@
 :: ============================================================================
 :MAIN
 
-setlocal EnableExtensions EnableDelayedExpansion
-
 set "EXIT_STATUS=0"
 
 call :COLOR_SCHEME
@@ -60,7 +58,7 @@ call :VERIFY_ACTIVATION
 :MAIN_EXIT
 
 if not defined EXIT_STATUS (set "EXIT_STATUS=0")
-endlocal & exit /b %EXIT_STATUS%
+exit /b %EXIT_STATUS%
 :: ============================================================================
 :: ============================================================================ MAIN END
 
