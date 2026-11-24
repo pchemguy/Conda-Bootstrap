@@ -45,19 +45,15 @@ if defined VSINSTALLDIR (
     goto :MAIN_EXIT
 ) else (
     echo %INFO% MSBuild: Proceeding to MSBuild search.
+    echo:
 )
 
-:: --- 2. Check explicit environment variable VCVARS ---
+:: --- 2. VCVARS_CHECK      - Check explicit environment variable VCVARS ---
+:: --- 3. MSVS_LOCATIONS    - Check default and custom MSVS locations    ---
+:: --- 4. MSBUILD_LOCATIONS - Check BuildTools locations                 ---
 
-call :VCVARS_CHECK      && call :MSBUILD_ACTIVATION && call :VERIFY_ACTIVATION && goto :MAIN_EXIT
-
-:: --- 3. Check default and custom MSVS locations ---
-
-call :MSVS_LOCATIONS    && call :MSBUILD_ACTIVATION && call :VERIFY_ACTIVATION && goto :MAIN_EXIT
-
-:: --- 4. Check BuildTools locations ---
-
-call :MSBUILD_LOCATIONS && call :MSBUILD_ACTIVATION && call :VERIFY_ACTIVATION && goto :MAIN_EXIT
+call :VCVARS_CHECK || call :MSVS_LOCATIONS || call :MSBUILD_LOCATIONS
+if defined _VCVARS call :MSBUILD_ACTIVATION
 
 call :VERIFY_ACTIVATION
 
