@@ -153,27 +153,6 @@ if defined _ARG_CACHE (
     goto :CLEANUP
 )
 
-:: --- Rename m2 link.exe before MSBuild check, if present ---
-
-if exist "%__CONDA_PREFIX%\Library\usr\bin\link.exe" (
-    echo %INFO% Renaming m2 link.exe to link_.exe to resolve MSBuild linker collision.
-    if exist "%__CONDA_PREFIX%\Library\usr\bin\link_.exe" (
-        echo %WARN% Removing previous backup "%__CONDA_PREFIX%\Library\usr\bin\link_.exe".
-        del /F /Q "%__CONDA_PREFIX%\Library\usr\bin\link_.exe"
-        if not "!ERRORLEVEL!"=="0" (
-            echo %ERROR% Failed to remove existing "%__CONDA_PREFIX%\Library\usr\bin\link_.exe". Aborting...
-            set "FINAL_EXIT_CODE=1"
-            goto :CLEANUP
-        )
-    )
-    move "%__CONDA_PREFIX%\Library\usr\bin\link.exe" "%__CONDA_PREFIX%\Library\usr\bin\link_.exe" >nul
-    if not "!ERRORLEVEL!"=="0" (
-        echo %ERROR% Failed to rename "%__CONDA_PREFIX%\Library\usr\bin\link.exe". Aborting...
-        set "FINAL_EXIT_CODE=1"
-        goto :CLEANUP
-    )
-)
-
 :: --- MS Build Tools ---
 
 if not exist "%~dp0msbuild.bat" (
