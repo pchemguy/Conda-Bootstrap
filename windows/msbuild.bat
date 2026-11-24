@@ -212,7 +212,6 @@ echo:
 
 if defined VisualStudioVersion (
     echo %INFO% VisualStudioVersion=%VisualStudioVersion%
-    echo %INFO% MSVS architechure: %VSCMD_ARG_TGT_ARCH%
     echo:
 ) else (
     echo %ERROR% VisualStudioVersion is not set.
