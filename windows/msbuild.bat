@@ -43,6 +43,8 @@ if defined VSINSTALLDIR (
     call :VERIFY_ACTIVATION
     set "EXIT_STATUS=!ERRORLEVEL!"
     goto :MAIN_EXIT
+) else (
+    echo %INFO% MSBuild: Proceeding to MSBuild search.
 )
 
 :: --- 2. Check explicit environment variable VCVARS ---
@@ -51,11 +53,13 @@ call :VCVARS_CHECK      && call :MSBUILD_ACTIVATION && call :VERIFY_ACTIVATION &
 
 :: --- 3. Check default and custom MSVS locations ---
 
-call :MSVS_LOCATIONS    && call :MSBUILD_ACTIVATION && call :VERIFY_ACTIVATION && goto :MAIN_EXIT
+rem call :MSVS_LOCATIONS    && call :MSBUILD_ACTIVATION && call :VERIFY_ACTIVATION && goto :MAIN_EXIT
 
 :: --- 4. Check BuildTools locations ---
 
 call :MSBUILD_LOCATIONS && call :MSBUILD_ACTIVATION && call :VERIFY_ACTIVATION && goto :MAIN_EXIT
+
+call :VERIFY_ACTIVATION
 
 :MAIN_EXIT
 
@@ -78,11 +82,14 @@ set "_EXIT_STATUS=0"
 
 echo %INFO% MSBuild: Checking if VCVARS points to vcvarsall.bat or vcvars64.bat.
 if not defined VCVARS (
-    call :WHERE_CLI "vcvars64.bat" "VCVARS64_BAT" || (exit /b 1)
-    set "VCVARS=%CLIPATH%"
+    call :WHERE_CLI "vcvars64.bat" "VCVARS64_BAT" "True"
+)
+if exist "%CLIPATH%" (
+    set "VCVARS=%CLIPATH:"=%"
+) else (
+    exit /b 1
 )
 
-set "VCVARS=%VCVARS:"=%"
 echo %INFO% MSBuild: VCVARS = "%VCVARS%".
 
 set "_VCVARS=%VCVARS:vcvarsall.bat=vcvars64.bat%"
@@ -139,7 +146,7 @@ exit /b %_EXIT_STATUS%
 
 set "_EXIT_STATUS=0"
 
-echo %INFO% MSBuild: Checking if BUILDTOOLS or MSBUILDTOOLS point to the "BuildTools" directory and fallback locations.
+echo %INFO% MSBuild: Checking if BUILDTOOLS or MSBUILDTOOLS or MSBUILD point to the "BuildTools" directory and fallback locations.
 for %%D in (
     "%~dp0..\MSBuildTools"
     "%~dp0..\BuildTools"
@@ -147,6 +154,7 @@ for %%D in (
     "%~d0\dev\BuildTools"
     "%MSBUILDTOOLS%"
     "%BUILDTOOLS%"
+    "%MSBUILD%"
 ) do (
     if exist "%%~fD\%VCVARS64%" (
         set "_VCVARS=%%~fD\%VCVARS64%"
@@ -174,10 +182,13 @@ echo %WARN% MSBuild: Activating MS Build Tools.
 echo %INFO% MSBuild: Calling "%_VCVARS%"
 echo:
 call "%_VCVARS%" || (
+    echo ----------------------------------------------------------------------
     echo:
     echo %ERROR% MSBuild: "%_VCVARS%" returned an error.
     exit /b 1
 ) 
+echo ----------------------------------------------------------------------
+echo:
 
 if not exist "%VCINSTALLDIR%" (
     echo %ERROR% MSBuild: MS Build Tools activation failed.
@@ -263,7 +274,7 @@ if "%EXIT_STATUS%"=="0" (
 )
 
 echo:
-echo --------------------------------------------------------------------------------
+echo ------------------------------------------------------------------------------------
 echo:
 
 if not defined EXIT_STATUS (set "EXIT_STATUS=0")
@@ -329,6 +340,8 @@ set "_CL_DIR=%~dp1"
 set "_LINK_EXE=%~f2"
 set "_LINK_DIR=%~dp2"
 
+echo:
+
 link.exe /? 2>&1 | findstr.exe /i /c:"Microsoft (R) Incremental Linker" /c:"/INCREMENTAL" >nul
 if not "%ERRORLEVEL%"=="0" (
     echo %ERROR% MSBuild: Linker collision detected: link.exe is not the Microsoft Incremental Linker.
@@ -344,9 +357,7 @@ if /i not "%_LINK_DIR%"=="%_CL_DIR%" (
     exit /b 1
 )
 
-echo:
 echo %INFO% Verified Microsoft linker.
-echo:
 exit /b 0
 :: ============================================================================
 :: ============================================================================ VERIFY_MS_LINKER END
