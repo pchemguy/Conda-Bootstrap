@@ -212,6 +212,7 @@ echo:
 
 if defined VisualStudioVersion (
     echo %INFO% VisualStudioVersion=%VisualStudioVersion%
+    echo %INFO% MSVS architechure: %VSCMD_ARG_TGT_ARCH%
     echo:
 ) else (
     echo %ERROR% VisualStudioVersion is not set.
@@ -415,22 +416,22 @@ if not defined CONDA_PREFIX (
     echo %ERROR% USE_ICU=1 requires an active Conda environment.
     exit /b 1
 )
-set "ICU_BIN=!CONDA_PREFIX!\Library\bin"
+set "ICU_BIN=%CONDA_PREFIX%\Library\bin"
 set "FOUND_ICU="
-for /f "usebackq delims=" %%F in (`dir /b /a:-d "!ICU_BIN!\icuuc*.dll" 2^>nul ^| findstr /i /r /x "icuuc[0-9][0-9]*\.dll"`) do (
+for /f "usebackq delims=" %%F in (`dir /b /a:-d "%ICU_BIN%\icuuc*.dll" 2^>nul ^| findstr /i /r /x "icuuc[0-9][0-9]*\.dll"`) do (
     set "FOUND_ICU=1"
     set "MACHINE=unknown"
-    for /f "usebackq tokens=1,2" %%M in (`dumpbin.exe /nologo /headers "!ICU_BIN!\%%F" ^|^| echo unreadable machine`) do (
+    for /f "usebackq tokens=1,2" %%M in (`dumpbin.exe /nologo /headers "%ICU_BIN%\%%F" ^|^| echo unreadable machine`) do (
         if /i "%%N"=="machine" set "MACHINE=%%M"
     )
     if /i not "!MACHINE!"=="%EXPECTED_MACHINE%" (
-        echo %ERROR% "!ICU_BIN!\%%F": expected %VSCMD_ARG_TGT_ARCH% [%EXPECTED_MACHINE%], observed !MACHINE!.
+        echo %ERROR% "%ICU_BIN%\%%F": expected %VSCMD_ARG_TGT_ARCH% [%EXPECTED_MACHINE%], observed !MACHINE!.
         exit /b 1
     )
-    echo %OKOK% "!ICU_BIN!\%%F": PE machine !MACHINE! matches target %VSCMD_ARG_TGT_ARCH%.
+    echo %OKOK% "%ICU_BIN%\%%F": PE machine !MACHINE! matches target %VSCMD_ARG_TGT_ARCH%.
 )
 if not defined FOUND_ICU (
-    echo %ERROR% No versioned ICU common DLL found in "!ICU_BIN!".
+    echo %ERROR% No versioned ICU common DLL found in "%ICU_BIN%".
     exit /b 1
 )
 exit /b 0
