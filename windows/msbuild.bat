@@ -53,7 +53,7 @@ call :VCVARS_CHECK      && call :MSBUILD_ACTIVATION && call :VERIFY_ACTIVATION &
 
 :: --- 3. Check default and custom MSVS locations ---
 
-rem call :MSVS_LOCATIONS    && call :MSBUILD_ACTIVATION && call :VERIFY_ACTIVATION && goto :MAIN_EXIT
+call :MSVS_LOCATIONS    && call :MSBUILD_ACTIVATION && call :VERIFY_ACTIVATION && goto :MAIN_EXIT
 
 :: --- 4. Check BuildTools locations ---
 
@@ -64,7 +64,7 @@ call :VERIFY_ACTIVATION
 :MAIN_EXIT
 
 if not defined EXIT_STATUS (set "EXIT_STATUS=0")
-endlocal && exit /b %EXIT_STATUS%
+endlocal & exit /b %EXIT_STATUS%
 :: ============================================================================
 :: ============================================================================ MAIN END
 
@@ -147,6 +147,9 @@ exit /b %_EXIT_STATUS%
 set "_EXIT_STATUS=0"
 
 echo %INFO% MSBuild: Checking if BUILDTOOLS or MSBUILDTOOLS or MSBUILD point to the "BuildTools" directory and fallback locations.
+
+call :CHECK_VARS MSBUILDTOOLS BUILDTOOLS MSBUILD
+
 for %%D in (
     "%~dp0..\MSBuildTools"
     "%~dp0..\BuildTools"
@@ -278,7 +281,7 @@ echo ---------------------------------------------------------------------------
 echo:
 
 if not defined EXIT_STATUS (set "EXIT_STATUS=0")
-endlocal && exit /b %EXIT_STATUS%
+endlocal & exit /b %EXIT_STATUS%
 :: ============================================================================
 :: ============================================================================ VERIFY_ACTIVATION END
 
@@ -397,7 +400,7 @@ if "%EXIT_STATUS%"=="0" (
 :VERIFY_MS_LINKER_EXIT
 
 if not defined EXIT_STATUS (set "EXIT_STATUS=0")
-endlocal && exit /b %EXIT_STATUS%
+endlocal & exit /b %EXIT_STATUS%
 :: ============================================================================
 :: ============================================================================ VERIFY_MS_LINKER END
 
@@ -431,6 +434,48 @@ if not defined FOUND_ICU (
 exit /b 0
 :: ============================================================================
 :: ============================================================================ CHECK_ICU_MACHINE END
+
+
+:: ============================================================================ CHECK_VARS BEGIN
+:: ============================================================================
+:CHECK_VARS
+:: 
+:: Accepts variable number of variable name candidates. For each name reports,
+:: if the corresponding variable is undefined or its value, if defined.
+
+setlocal
+
+set "PAD10=          "
+set "WIDTH=25"
+
+echo:
+echo ----------------------------------------------------------------------
+echo Checking environment variables:
+echo     %*
+echo:
+
+:NEXT_VAR
+
+if "%~1"=="" goto :CHECK_VARS_EXIT
+
+set "VAR_LABEL=%~1=%PAD10%%PAD10%%PAD10%%PAD10%"
+set "VAR_LABEL=!VAR_LABEL:~0,%WIDTH%!"
+
+if defined %~1 (
+    echo %INFO% %VAR_LABEL% ''!%~1!''
+) else (
+    echo %WARN% %VAR_LABEL% not defined.
+)
+shift & goto :NEXT_VAR
+
+:CHECK_VARS_EXIT
+
+echo ----------------------------------------------------------------------
+echo:
+
+endlocal & exit /b 0
+:: ============================================================================
+:: ============================================================================ CHECK_VARS END
 
 
 :: ============================================================================ COLOR_SCHEME BEGIN
