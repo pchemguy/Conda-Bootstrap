@@ -351,21 +351,50 @@ echo:
 link.exe /? 2>&1 | findstr.exe /i /c:"Microsoft (R) Incremental Linker" /c:"/INCREMENTAL" >nul
 set "EXIT_STATUS=%ERRORLEVEL%"
 
-if not "%EXIT_STATUS%"=="0" (
-    echo %ERROR% MSBuild: Linker collision detected: link.exe is not the Microsoft Incremental Linker.
-    echo %ERROR% MSBuild: Executing link.exe resolved to "%_LINK_EXE%" -- likely MSYS/Git/GNU link.exe.
-    echo %ERROR% MSBuild: Expected MSVC toolset directory: "%_CL_DIR%".
-    set "EXIT_STATUS=1"
+if "%EXIT_STATUS%"=="0" (
+    echo %INFO% Verified Microsoft linker.
+    goto :VERIFY_MS_LINKER_EXIT
 )
 
+:: --- Issue a warning and attempt resolving collision ---
+
+echo %ERROR% MSBuild: Linker collision detected: link.exe is not the Microsoft Incremental Linker.
+echo %INFO% MSBuild: Executing link.exe resolved to "%_LINK_EXE%" -- likely MSYS/Git/GNU link.exe.
+echo %INFO% MSBuild: Expected MSVC toolset directory: "%_CL_DIR%".
 if /i not "%_LINK_DIR%"=="%_CL_DIR%" (
-    echo %ERROR% MSBuild: Linker collision detected: link.exe directory does not match active cl.exe directory.
-    echo %ERROR% MSBuild: Resolved link.exe: "%_LINK_EXE%"
-    echo %ERROR% MSBuild: Active cl.exe:     "%_CL_EXE%"
-    set "EXIT_STATUS=1"
+    echo %INFO% MSBuild: link.exe directory does not match active cl.exe directory.
+    echo %INFO% MSBuild: Resolved link.exe: "%_LINK_EXE%"
+    echo %INFO% MSBuild: Active cl.exe:     "%_CL_EXE%"
+)
+echo:
+
+rem If the offending link.exe does not belong to a local conda environment
+rem with the creator script having a matching name {Anaconda - Anaconda.bat}
+rem sitting next to the environemnt directory, fail without renaming.
+rem
+if not exist "%_LINK_EXE:\Library\usr\bin\link.exe=%.bat" (
+    echo %WARN% "%%_LINK_EXE:\Library\usr\bin\link.exe=%%.bat" is not a valid batch file.
+    echo %INFO% Automatic reoslution of link.exe collision is not supported.
+    echo %INFO% Consider manual rename if appropriate.
+    goto :VERIFY_MS_LINKER_EXIT
 )
 
-echo %INFO% Verified Microsoft linker.
+echo %WARN% Renaming the offending linker.
+ren "%_LINK_EXE%" "link_.exe" || (
+    echo %ERROR% Failed to rename offending linker.
+    goto :VERIFY_MS_LINKER_EXIT
+)
+
+link.exe /? 2>&1 | findstr.exe /i /c:"Microsoft (R) Incremental Linker" /c:"/INCREMENTAL" >nul
+set "EXIT_STATUS=%ERRORLEVEL%"
+
+if "%EXIT_STATUS%"=="0" (
+    echo %WARN% Renamed the offending link.exe to link_.exe and Verified Microsoft linker.
+) else (
+    echo %ERROR% Failed to resolve conflict by renaming the offending link.exe.
+)
+
+:VERIFY_MS_LINKER_EXIT
 
 if not defined EXIT_STATUS (set "EXIT_STATUS=0")
 endlocal && exit /b %EXIT_STATUS%
